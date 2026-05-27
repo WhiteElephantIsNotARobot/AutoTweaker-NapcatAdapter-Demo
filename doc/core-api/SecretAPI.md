@@ -6,22 +6,24 @@
 
 ```kotlin
 interface SecretAPI {
-    fun isUnlocked(): Boolean
+    val isUnlocked: StateFlow<Boolean>
     fun isPasswordEmpty(): Boolean
     fun unlock(password: String)
     fun changePassword(oldPassword: String, newPassword: String)
 }
 ```
 
-## 方法
+## 属性
 
 ### isUnlocked
 
 ```kotlin
-fun isUnlocked(): Boolean
+val isUnlocked: StateFlow<Boolean>
 ```
 
-检查密钥库是否已解锁。
+密钥库解锁状态流。`true` 表示已解锁，`false` 表示未解锁。
+
+## 方法
 
 ### isPasswordEmpty
 
@@ -99,8 +101,13 @@ fun changePassword(oldPassword: String, newPassword: String)
 val secret = core.secret
 
 // 检查状态
-if (!secret.isUnlocked()) {
+if (!secret.isUnlocked.value) {
     secret.unlock("my-password")
+}
+
+// 监听解锁状态变化
+secret.isUnlocked.collect { unlocked ->
+    println("Secret unlocked: $unlocked")
 }
 
 // 修改密码

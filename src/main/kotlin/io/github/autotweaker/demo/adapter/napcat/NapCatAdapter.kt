@@ -53,7 +53,7 @@ class NapCatAdapter : Adapter {
         adapterScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
         // 检查密钥库是否已解锁
-        if (!core.secret.isUnlocked()) {
+        if (!core.secret.isUnlocked.value) {
             logger.info("Secret is locked, waiting for unlock...")
             adapterScope?.launch {
                 waitForUnlockAndInitialize(core)
@@ -67,7 +67,7 @@ class NapCatAdapter : Adapter {
 
     private suspend fun waitForUnlockAndInitialize(core: CoreAPI) {
         try {
-            while (!core.secret.isUnlocked()) {
+            while (!core.secret.isUnlocked.value) {
                 delay(1000)
             }
             logger.info("Secret unlocked, initializing components...")

@@ -1,6 +1,6 @@
 # AutoTweaker API 文档
 
-> 版本: v0.1.0-alpha.8
+> 版本: v0.1.0-alpha.9
 > 源码: [github.com/AutoTweaker/core](https://github.com/AutoTweaker/core/tree/main/api/src/main/kotlin/io/github/autotweaker/api)
 
 ## 概述
