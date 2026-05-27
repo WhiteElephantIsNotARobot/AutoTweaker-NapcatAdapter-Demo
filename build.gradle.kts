@@ -20,6 +20,7 @@ repositories {
 dependencies {
     implementation("io.github.autotweaker:api:0.1.0-alpha.5")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+    implementation("org.slf4j:slf4j-api:2.0.18")
 }
 
 application {
