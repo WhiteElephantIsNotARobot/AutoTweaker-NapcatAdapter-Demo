@@ -1,5 +1,6 @@
 package io.github.autotweaker.demo.adapter.napcat
 
+import com.google.auto.service.AutoService
 import io.github.autotweaker.api.adapter.Adapter
 import io.github.autotweaker.api.adapter.CoreAPI
 import io.github.autotweaker.api.types.SemVer
@@ -7,6 +8,7 @@ import io.github.autotweaker.api.types.Url
 import io.github.autotweaker.api.types.adapter.AdapterInfo
 import org.slf4j.LoggerFactory
 
+@AutoService(Adapter::class)
 class NapCatAdapter : Adapter {
     private val logger = LoggerFactory.getLogger(NapCatAdapter::class.java)
     private var core: CoreAPI? = null
