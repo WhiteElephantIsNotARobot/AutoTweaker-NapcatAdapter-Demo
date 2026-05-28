@@ -22,6 +22,8 @@ import java.util.concurrent.CopyOnWriteArrayList
  * 管理会话映射和模型配置：
  * - 会话映射：userId → activeSessionId（每用户）
  * - 主模型：每用户隔离，用户可自行设置
+ * - 工作区：每用户隔离，用户可自行选择
+ * - Thinking：每用户隔离，用户可自行开关
  * - 备选/压缩模型：全局共享，操作员管理
  *
  * @property core CoreAPI 实例
@@ -38,6 +40,7 @@ class SessionManager(
         private const val SESSION_MAP_KEY = "session_map"
         private const val USER_MODELS_KEY = "user_models"
         private const val USER_WORKSPACES_KEY = "user_workspaces"
+        private const val USER_THINKING_KEY = "user_thinking"
         private const val GLOBAL_CONFIG_KEY = "global_config"
     }
 
@@ -53,6 +56,9 @@ class SessionManager(
 
     /** userId → 选择的工作区 ID（每用户隔离） */
     private val userSelectedWorkspaces = ConcurrentHashMap<Long, UUID>()
+
+    /** userId → 是否启用 thinking（每用户隔离） */
+    private val userThinking = ConcurrentHashMap<Long, Boolean>()
 
     /** 全局备选模型列表（操作员管理），线程安全 */
     private val globalFallbackModels = CopyOnWriteArrayList<UUID>()
@@ -133,6 +139,28 @@ class SessionManager(
         userSelectedWorkspaces[userId] = workspaceId
         saveToStore()
         logger.info("User {} selected workspace {}", userId, workspaceId)
+    }
+
+    // ==================== 用户 Thinking 设置（每用户隔离） ====================
+
+    /**
+     * 获取用户的 thinking 设置
+     *
+     * @param userId QQ 号
+     * @return 是否启用 thinking，未设置返回 false
+     */
+    fun getUserThinking(userId: Long): Boolean = userThinking[userId] ?: false
+
+    /**
+     * 设置用户的 thinking 开关
+     *
+     * @param userId QQ 号
+     * @param enabled 是否启用
+     */
+    fun setUserThinking(userId: Long, enabled: Boolean) {
+        userThinking[userId] = enabled
+        saveToStore()
+        logger.info("User {} thinking set to {}", userId, enabled)
     }
 
     // ==================== 全局模型配置（操作员管理） ====================
@@ -272,7 +300,7 @@ class SessionManager(
             model = primaryModel,
             fallbackModel = fallbackModels,
             summarizeModel = summarizeModel,
-            thinking = false
+            thinking = getUserThinking(userId)
         )
     }
 
@@ -286,10 +314,11 @@ class SessionManager(
             obj[SESSION_MAP_KEY]?.let { loadSessionMap(it) }
             obj[USER_MODELS_KEY]?.let { loadUserModels(it) }
             obj[USER_WORKSPACES_KEY]?.let { loadUserWorkspaces(it) }
+            obj[USER_THINKING_KEY]?.let { loadUserThinking(it) }
             obj[GLOBAL_CONFIG_KEY]?.let { loadGlobalConfig(it) }
 
-            logger.debug("Loaded {} sessions, {} user models, {} user workspaces",
-                activeSessions.size, userPrimaryModels.size, userSelectedWorkspaces.size)
+            logger.debug("Loaded {} sessions, {} user models, {} user workspaces, {} user thinking",
+                activeSessions.size, userPrimaryModels.size, userSelectedWorkspaces.size, userThinking.size)
         } catch (e: Exception) {
             logger.warn("Failed to load from store", e)
         }
@@ -337,6 +366,20 @@ class SessionManager(
         }
     }
 
+    private fun loadUserThinking(element: kotlinx.serialization.json.JsonElement) {
+        try {
+            element.jsonObject.forEach { (key, value) ->
+                try {
+                    userThinking[key.toLong()] = value.jsonPrimitive.content.toBoolean()
+                } catch (e: Exception) {
+                    logger.warn("Failed to parse user thinking: {} -> {}", key, value)
+                }
+            }
+        } catch (e: Exception) {
+            logger.warn("Failed to load user thinking", e)
+        }
+    }
+
     private fun loadGlobalConfig(element: kotlinx.serialization.json.JsonElement) {
         try {
             val obj = element.jsonObject
@@ -371,6 +414,11 @@ class SessionManager(
                 put(USER_WORKSPACES_KEY, buildJsonObject {
                     userSelectedWorkspaces.forEach { (userId, workspaceId) ->
                         put(userId.toString(), JsonPrimitive(workspaceId.toString()))
+                    }
+                })
+                put(USER_THINKING_KEY, buildJsonObject {
+                    userThinking.forEach { (userId, enabled) ->
+                        put(userId.toString(), JsonPrimitive(enabled))
                     }
                 })
                 put(GLOBAL_CONFIG_KEY, buildJsonObject {
