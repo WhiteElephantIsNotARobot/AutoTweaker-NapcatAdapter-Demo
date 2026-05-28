@@ -6,6 +6,7 @@ import io.github.autotweaker.api.adapter.CoreAPI
 import io.github.autotweaker.api.types.SemVer
 import io.github.autotweaker.api.types.Url
 import io.github.autotweaker.api.types.adapter.AdapterInfo
+import io.github.autotweaker.demo.adapter.napcat.api.NapCatApi
 import io.github.autotweaker.demo.adapter.napcat.bridge.MessageBridge
 import io.github.autotweaker.demo.adapter.napcat.bridge.SessionManager
 import io.github.autotweaker.demo.adapter.napcat.command.CommandRegistry
@@ -30,8 +31,18 @@ import org.slf4j.LoggerFactory
 @AutoService(Adapter::class)
 class NapCatAdapter : Adapter {
 
+    companion object {
+        private var _core: CoreAPI? = null
+        private var _napCatApi: NapCatApi? = null
+
+        /** CoreAPI 实例，适配器启动后可用 */
+        val core: CoreAPI get() = _core ?: throw IllegalStateException("NapCatAdapter not started")
+
+        /** NapCat API 实例，WebSocket 连接后可用 */
+        val napCatApi: NapCatApi get() = _napCatApi ?: throw IllegalStateException("NapCatAdapter not started")
+    }
+
     private val logger = LoggerFactory.getLogger(NapCatAdapter::class.java)
-    private var core: CoreAPI? = null
     private var wsClient: NapCatWsClient? = null
     private var messageBridge: MessageBridge? = null
     private var adapterScope: CoroutineScope? = null
@@ -47,7 +58,7 @@ class NapCatAdapter : Adapter {
     }
 
     override fun start(core: CoreAPI) {
-        this.core = core
+        _core = core
         logger.info("NapCat adapter starting...")
 
         // 创建适配器级协程作用域
@@ -146,6 +157,7 @@ class NapCatAdapter : Adapter {
 
         this.wsClient = client
         this.messageBridge = bridge
+        _napCatApi = client
     }
 
     override fun stop() {
@@ -162,7 +174,8 @@ class NapCatAdapter : Adapter {
         wsClient = null
         messageBridge = null
         adapterScope = null
-        core = null
+        _core = null
+        _napCatApi = null
         logger.info("NapCat adapter stopped")
     }
 }
