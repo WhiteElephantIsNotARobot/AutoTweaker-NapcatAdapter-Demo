@@ -191,9 +191,22 @@ class SessionManager(
         val role = permissionManager.getRole(userId)
         val config = buildSessionConfig(userId)
 
+        // 获取用户选择的工作区
+        val selectedWorkspaceId = userSelectedWorkspaces[userId]
+
         val handle = if (permissionManager.hasNonContainerPermission(userId)) {
-            // 有非容器权限：用默认工作区
-            core.session.create(config)
+            // 有非容器权限：优先使用用户选择的工作区，否则用默认工作区
+            if (selectedWorkspaceId != null) {
+                val workspace = core.session.listWorkspaces()
+                    .find { it.meta.id == selectedWorkspaceId }
+                if (workspace != null) {
+                    core.session.create(workspace.meta.id, config)
+                } else {
+                    core.session.create(config)
+                }
+            } else {
+                core.session.create(config)
+            }
         } else {
             // 无非容器权限：只能用容器内工作区
             val containerWorkspaces = core.session.listWorkspaces()
@@ -203,7 +216,6 @@ class SessionManager(
             }
 
             // 优先使用用户选择的工作区
-            val selectedWorkspaceId = userSelectedWorkspaces[userId]
             val workspace = if (selectedWorkspaceId != null) {
                 containerWorkspaces.find { it.meta.id == selectedWorkspaceId }
                     ?: containerWorkspaces.first()
