@@ -126,6 +126,9 @@ class NapCatAdapter : Adapter {
         // 初始化 WebSocket 客户端
         val client = NapCatWsClientImpl()
 
+        // 提前暴露 API 实例，供 Tool 使用
+        _napCatApi = client
+
         // 初始化消息桥接，传入适配器级协程作用域
         val scope = adapterScope!!
         val bridge = MessageBridge(core, client, sessionManager, commandRegistry, permissionManager, scope)
@@ -157,7 +160,6 @@ class NapCatAdapter : Adapter {
 
         this.wsClient = client
         this.messageBridge = bridge
-        _napCatApi = client
     }
 
     override fun stop() {
