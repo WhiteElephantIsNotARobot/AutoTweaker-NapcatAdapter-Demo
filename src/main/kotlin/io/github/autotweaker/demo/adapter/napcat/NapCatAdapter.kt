@@ -105,6 +105,9 @@ class NapCatAdapter : Adapter {
             register(ListCommand())
             register(ApproveCommand())
             register(OperatorCommand())
+            register(ModelCommand())
+            register(WorkspaceCommand())
+            register(UserCommand())
         }
 
         // 初始化 WebSocket 客户端

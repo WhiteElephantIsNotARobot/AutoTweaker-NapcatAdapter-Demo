@@ -75,7 +75,8 @@ class CommandRegistry {
             return "未知命令: /$name\n输入 /help 查看可用命令"
         }
 
-        if (context.role.ordinal > command.requiredRole.ordinal) {
+        val role = context.role
+        if (role == null || role.ordinal > command.requiredRole.ordinal) {
             return "权限不足，需要 ${command.requiredRole.name} 角色"
         }
 

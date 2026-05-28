@@ -4,62 +4,67 @@ import io.github.autotweaker.api.adapter.CoreAPI
 import io.github.autotweaker.demo.adapter.napcat.config.NapCatSettings
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * 权限管理器
  *
- * 基于三级角色体系管理用户权限：
+ * 四级角色体系：
  * - 管理员：通过 [NapCatSettings.AdminQQ] 配置，仅一个
- * - 操作员：通过 JsonStore 持久化，由管理员命令指定
- * - 用户：默认角色
+ * - 操作员：由管理员命令指定，持久化
+ * - 用户：由操作员命令指定，持久化（白名单）
+ * - 未授权：默认状态，无法使用 bot
  *
- * @property core CoreAPI 实例，用于访问配置服务
+ * @property core CoreAPI 实例
  */
 class PermissionManager(private val core: CoreAPI) {
 
     private val logger = LoggerFactory.getLogger(PermissionManager::class.java)
 
-    companion object {
-        private const val OPERATOR_STORE_KEY = "operators"
-    }
-
-    private val operatorStore by lazy {
+    private val store by lazy {
         core.config.jsonStore(PermissionManager::class)
     }
 
-    /** 缓存的管理员 QQ 号，-1 表示未加载 */
     @Volatile
     private var cachedAdminQQ: Long = -1L
 
-    /** 缓存的操作员列表，线程安全 */
     private val cachedOperators = CopyOnWriteArrayList<Long>()
+    private val cachedUsers = CopyOnWriteArrayList<Long>()
 
-    /** 操作员缓存是否已加载 */
+    /** 用户非容器权限：有此权限的用户可使用容器外工作区 */
+    private val userNonContainerPermissions = ConcurrentHashMap.newKeySet<Long>()
+
     @Volatile
     private var operatorsLoaded = false
+    @Volatile
+    private var usersLoaded = false
 
     /**
      * 获取用户角色
      *
      * @param userId QQ 号
-     * @return 用户角色
+     * @return 用户角色，未授权返回 null
      */
-    fun getRole(userId: Long): Role {
+    fun getRole(userId: Long): Role? {
         if (userId == getAdminQQ()) return Role.ADMIN
         if (isOperator(userId)) return Role.OPERATOR
-        return Role.USER
+        if (isUser(userId)) return Role.USER
+        return null  // 未授权
     }
 
     /**
-     * 添加操作员
-     *
-     * @param userId 要添加的 QQ 号
-     * @return true 如果添加成功，false 如果已是操作员
+     * 检查用户是否已授权（至少是 USER 角色）
      */
+    fun isAuthorized(userId: Long): Boolean = getRole(userId) != null
+
+    // ==================== 操作员管理 ====================
+
     fun addOperator(userId: Long): Boolean {
         ensureOperatorsLoaded()
         if (userId in cachedOperators) return false
@@ -69,12 +74,6 @@ class PermissionManager(private val core: CoreAPI) {
         return true
     }
 
-    /**
-     * 移除操作员
-     *
-     * @param userId 要移除的 QQ 号
-     * @return true 如果移除成功，false 如果不是操作员
-     */
     fun removeOperator(userId: Long): Boolean {
         ensureOperatorsLoaded()
         if (!cachedOperators.remove(userId)) return false
@@ -83,15 +82,89 @@ class PermissionManager(private val core: CoreAPI) {
         return true
     }
 
-    /**
-     * 列出所有操作员
-     *
-     * @return 操作员 QQ 号列表
-     */
     fun listOperators(): List<Long> {
         ensureOperatorsLoaded()
         return cachedOperators.toList()
     }
+
+    // ==================== 用户管理（白名单） ====================
+
+    fun addUser(userId: Long): Boolean {
+        ensureUsersLoaded()
+        if (userId in cachedUsers) return false
+        cachedUsers.add(userId)
+        saveUsers()
+        logger.info("Added user: {}", userId)
+        return true
+    }
+
+    fun removeUser(userId: Long): Boolean {
+        ensureUsersLoaded()
+        if (!cachedUsers.remove(userId)) return false
+        saveUsers()
+        logger.info("Removed user: {}", userId)
+        return true
+    }
+
+    fun listUsers(): List<Long> {
+        ensureUsersLoaded()
+        return cachedUsers.toList()
+    }
+
+    // ==================== 非容器权限管理 ====================
+
+    /**
+     * 检查用户是否有非容器权限（可使用容器外工作区）
+     *
+     * ADMIN/OPERATOR 自动有此权限，USER 需要单独配置。
+     *
+     * @param userId QQ 号
+     * @return true 如果有非容器权限
+     */
+    fun hasNonContainerPermission(userId: Long): Boolean {
+        val role = getRole(userId)
+        if (role == null) return false
+        if (role.ordinal <= Role.OPERATOR.ordinal) return true
+        return userId in userNonContainerPermissions
+    }
+
+    /**
+     * 授予用户非容器权限
+     *
+     * @param userId QQ 号
+     * @return true 如果授予成功，false 如果已有权限
+     */
+    fun grantNonContainerPermission(userId: Long): Boolean {
+        if (userId in userNonContainerPermissions) return false
+        userNonContainerPermissions.add(userId)
+        saveNonContainerPermissions()
+        logger.info("Granted non-container permission to user {}", userId)
+        return true
+    }
+
+    /**
+     * 撤销用户非容器权限
+     *
+     * @param userId QQ 号
+     * @return true 如果撤销成功
+     */
+    fun revokeNonContainerPermission(userId: Long): Boolean {
+        if (!userNonContainerPermissions.remove(userId)) return false
+        saveNonContainerPermissions()
+        logger.info("Revoked non-container permission from user {}", userId)
+        return true
+    }
+
+    /**
+     * 列出有非容器权限的用户
+     *
+     * @return 有非容器权限的用户 QQ 号列表
+     */
+    fun listNonContainerUsers(): List<Long> {
+        return userNonContainerPermissions.toList()
+    }
+
+    // ==================== 内部实现 ====================
 
     private fun getAdminQQ(): Long {
         if (cachedAdminQQ == -1L) {
@@ -105,36 +178,67 @@ class PermissionManager(private val core: CoreAPI) {
         return userId in cachedOperators
     }
 
+    private fun isUser(userId: Long): Boolean {
+        ensureUsersLoaded()
+        return userId in cachedUsers
+    }
+
     private fun ensureOperatorsLoaded() {
         if (operatorsLoaded) return
         synchronized(this) {
             if (operatorsLoaded) return
-            loadOperators()
+            loadList("operators") { cachedOperators.addAll(it) }
             operatorsLoaded = true
         }
     }
 
-    private fun loadOperators() {
-        try {
-            val element = operatorStore.get()
-            if (element != null) {
-                val operators = element.jsonArray.map { it.jsonPrimitive.content.toLong() }
-                cachedOperators.clear()
-                cachedOperators.addAll(operators)
-            }
-        } catch (e: Exception) {
-            logger.warn("Failed to load operators", e)
+    private fun ensureUsersLoaded() {
+        if (usersLoaded) return
+        synchronized(this) {
+            if (usersLoaded) return
+            loadList("users") { cachedUsers.addAll(it) }
+            loadList("non_container") { userNonContainerPermissions.addAll(it) }
+            usersLoaded = true
         }
     }
 
-    private fun saveOperators() {
+    private fun loadList(key: String, addTo: (List<Long>) -> Unit) {
         try {
-            val array = buildJsonArray {
-                cachedOperators.forEach { add(JsonPrimitive(it.toString())) }
-            }
-            operatorStore.set(array)
+            val element = store.get() ?: return
+            val arr = element.jsonObject[key]?.jsonArray ?: return
+            val ids = arr.map { it.jsonPrimitive.content.toLong() }
+            addTo(ids)
         } catch (e: Exception) {
-            logger.error("Failed to save operators", e)
+            logger.warn("Failed to load list: {}", key, e)
+        }
+    }
+
+    private fun saveOperators() = saveList("operators", cachedOperators)
+    private fun saveUsers() = saveList("users", cachedUsers)
+    private fun saveNonContainerPermissions() = saveList("non_container", userNonContainerPermissions.toList())
+
+    private fun saveList(key: String, list: List<Long>) {
+        try {
+            // 读取现有数据，合并后写回
+            val existing = try {
+                store.get()?.jsonObject
+            } catch (e: Exception) {
+                null
+            }
+
+            val obj = buildJsonObject {
+                // 保留其他 key
+                existing?.forEach { (k, v) ->
+                    if (k != key) put(k, v)
+                }
+                // 更新当前 key
+                put(key, buildJsonArray {
+                    list.forEach { add(JsonPrimitive(it.toString())) }
+                })
+            }
+            store.set(obj)
+        } catch (e: Exception) {
+            logger.error("Failed to save list: {}", key, e)
         }
     }
 }

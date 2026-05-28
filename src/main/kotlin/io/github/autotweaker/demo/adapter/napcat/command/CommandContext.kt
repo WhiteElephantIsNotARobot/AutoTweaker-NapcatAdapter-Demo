@@ -13,7 +13,7 @@ import io.github.autotweaker.demo.adapter.napcat.permission.Role
  *
  * @property userId 发送者 QQ 号
  * @property groupId 群号，null 表示私聊
- * @property role 发送者角色
+ * @property role 发送者角色，null 表示未授权
  * @property args 命令参数（不含命令名本身）
  * @property core CoreAPI 实例
  * @property napCat NapCat API 实例
@@ -23,7 +23,7 @@ import io.github.autotweaker.demo.adapter.napcat.permission.Role
 data class CommandContext(
     val userId: Long,
     val groupId: Long?,
-    val role: Role,
+    val role: Role?,
     val args: List<String>,
     val core: CoreAPI,
     val napCat: NapCatApi,

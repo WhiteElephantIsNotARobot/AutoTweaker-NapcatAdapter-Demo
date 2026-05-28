@@ -81,6 +81,12 @@ class MessageBridge(
             return
         }
 
+        // 检查授权
+        if (!permissionManager.isAuthorized(userId)) {
+            sendReply(groupId, userId, "未授权，请联系管理员添加白名单")
+            return
+        }
+
         logger.debug("Group message from user {} in group {}: {}", userId, groupId, text)
 
         // 尝试命令分发
@@ -102,6 +108,12 @@ class MessageBridge(
             .trim()
 
         if (text.isEmpty()) return
+
+        // 检查授权
+        if (!permissionManager.isAuthorized(userId)) {
+            sendReply(null, userId, "未授权，请联系管理员添加白名单")
+            return
+        }
 
         logger.debug("Private message from user {}: {}", userId, text)
 

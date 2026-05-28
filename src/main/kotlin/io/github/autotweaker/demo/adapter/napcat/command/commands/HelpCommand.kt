@@ -18,8 +18,10 @@ class HelpCommand(private val registry: CommandRegistry) : Command {
     override val requiredRole = Role.USER
 
     override suspend fun execute(context: CommandContext): String {
+        val role = context.role ?: return "未授权"
+
         val commands = registry.listCommands()
-            .filter { context.role.ordinal <= it.requiredRole.ordinal }
+            .filter { role.ordinal <= it.requiredRole.ordinal }
             .sortedBy { it.name }
 
         return buildString {
