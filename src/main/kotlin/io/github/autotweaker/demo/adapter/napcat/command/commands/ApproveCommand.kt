@@ -38,8 +38,6 @@ class ApproveCommand : Command {
         return try {
             val approvals = listOf(ToolApprove(callId = callId, approved = true))
             context.core.session.approveToolCall(handle.id, approvals)
-            // 清除待审批记录
-            context.messageBridge.clearPendingToolCalls(handle.id)
             "已审批工具调用: $callId"
         } catch (e: Exception) {
             "审批失败: ${e.message}"
