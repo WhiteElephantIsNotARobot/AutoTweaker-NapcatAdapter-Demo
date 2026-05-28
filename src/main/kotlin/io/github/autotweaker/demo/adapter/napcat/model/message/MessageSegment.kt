@@ -66,6 +66,10 @@ sealed interface MessageSegment {
     @Serializable
     data class Poke(val type: String, val id: String) : MessageSegment
 
+    /** 合并转发消息段 */
+    @Serializable
+    data class Forward(val id: String) : MessageSegment
+
     /** 未知类型消息段 */
     data class Unknown(val type: String) : MessageSegment
 }
@@ -102,6 +106,9 @@ object MessageSegmentSerializer : KSerializer<MessageSegment> {
             )
             "poke" -> MessageSegment.Poke(
                 type = data["type"]?.jsonPrimitive?.content ?: "",
+                id = data["id"]?.jsonPrimitive?.content ?: ""
+            )
+            "forward" -> MessageSegment.Forward(
                 id = data["id"]?.jsonPrimitive?.content ?: ""
             )
             else -> MessageSegment.Unknown(type)
@@ -157,6 +164,12 @@ object MessageSegmentSerializer : KSerializer<MessageSegment> {
                 put("type", "poke")
                 putJsonObject("data") {
                     put("type", value.type)
+                    put("id", value.id)
+                }
+            }
+            is MessageSegment.Forward -> buildJsonObject {
+                put("type", "forward")
+                putJsonObject("data") {
                     put("id", value.id)
                 }
             }

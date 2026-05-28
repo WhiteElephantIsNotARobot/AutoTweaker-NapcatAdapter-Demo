@@ -9,6 +9,7 @@ import io.github.autotweaker.demo.adapter.napcat.api.NapCatApi
 import io.github.autotweaker.demo.adapter.napcat.command.CommandContext
 import io.github.autotweaker.demo.adapter.napcat.command.CommandRegistry
 import io.github.autotweaker.demo.adapter.napcat.model.data.ForwardMessage
+import io.github.autotweaker.demo.adapter.napcat.model.message.MessageChain
 import io.github.autotweaker.demo.adapter.napcat.model.event.GroupMessageEvent
 import io.github.autotweaker.demo.adapter.napcat.model.event.MessageEvent
 import io.github.autotweaker.demo.adapter.napcat.model.event.PrivateMessageEvent
@@ -112,8 +113,8 @@ class MessageBridge(
             return
         }
 
-        // 普通消息，转发到活跃会话
-        forwardToSession(userId, groupId, text)
+        // 普通消息，转发到活跃会话（传递消息链用于检测合并转发）
+        forwardToSession(userId, groupId, text, event.message)
     }
 
     private suspend fun handlePrivateMessage(event: PrivateMessageEvent) {
@@ -138,8 +139,8 @@ class MessageBridge(
             return
         }
 
-        // 普通消息，转发到活跃会话
-        forwardToSession(userId, null, text)
+        // 普通消息，转发到活跃会话（传递消息链用于检测合并转发）
+        forwardToSession(userId, null, text, event.message)
     }
 
     /**
@@ -160,7 +161,7 @@ class MessageBridge(
         return text.ifEmpty { null }
     }
 
-    private suspend fun forwardToSession(userId: Long, groupId: Long?, text: String) {
+    private suspend fun forwardToSession(userId: Long, groupId: Long?, text: String, messageChain: MessageChain? = null) {
         var handle = sessionManager.getActiveSessionHandle(userId)
 
         // 无活跃会话，自动创建
@@ -185,8 +186,20 @@ class MessageBridge(
         pendingToolCalls.remove(handle.id)
 
         try {
+            // 检测消息链中的合并转发
+            val forwardSegments = messageChain?.filterIsInstance<MessageSegment.Forward>() ?: emptyList()
+            val processedText = if (forwardSegments.isNotEmpty()) {
+                processForwardSegments(text, forwardSegments)
+            } else {
+                text
+            }
+
             // 构建带上下文的消息
-            val messageWithContext = buildMessageWithContext(groupId, userId, text)
+            val messageWithContext = if (groupId != null) {
+                buildMessageWithContext(groupId, userId, processedText)
+            } else {
+                processedText
+            }
             core.session.send(handle.id, messageWithContext)
         } catch (e: Exception) {
             logger.error("Failed to send message to session {}", handle.id, e)
@@ -195,103 +208,109 @@ class MessageBridge(
     }
 
     /**
-     * 构建带上下文的消息
+     * 处理消息链中的合并转发段
      *
-     * 在消息开头注入会话所在的群/私聊信息，以及最近的群消息历史和环境信息
+     * 从消息链中提取 Forward 段，获取实际内容并替换到文本中
      */
-    private suspend fun buildMessageWithContext(groupId: Long?, userId: Long, text: String): String {
-        return try {
-            val contextBuilder = StringBuilder()
-
-            // 注入会话所在的群/私聊信息
-            contextBuilder.appendLine("<session-info>")
-            if (groupId != null) {
-                // 群聊：获取群名并注入群号和群名
-                val groupName = try {
-                    napCat.getGroupList().find { it.groupId == groupId }?.groupName
-                } catch (e: Exception) {
-                    logger.warn("Failed to get group list for group name: {}", e.message)
-                    null
-                }
-                contextBuilder.appendLine("会话类型：群聊")
-                contextBuilder.appendLine("群号：$groupId")
-                if (groupName != null) {
-                    contextBuilder.appendLine("群名：$groupName")
-                }
-            } else {
-                // 私聊
-                contextBuilder.appendLine("会话类型：私聊")
-                contextBuilder.appendLine("用户 QQ 号：$userId")
-            }
-            contextBuilder.appendLine("</session-info>")
-            contextBuilder.appendLine()
-
-            // 群聊时获取最近的群消息历史
-            if (groupId != null) {
-                val history = napCat.getGroupMsgHistory(groupId, count = 20)
-
-                // 构建上下文
-                contextBuilder.appendLine("<context>")
-
-                // 获取群成员列表用于获取昵称
-                val members = try {
-                    napCat.getGroupMemberList(groupId)
-                } catch (e: Exception) {
-                    emptyList()
-                }
-
-                // 收集合并转发消息
-                val forwardMessages = mutableMapOf<String, List<ForwardMessage>>()
-
-                // 构建消息历史
-                history.reversed().forEach { msg ->
-                    val nickname = members.find { it.userId == msg.userId }?.let {
-                        it.card.ifEmpty { it.nickname }
-                    } ?: msg.sender.nickname.ifEmpty { msg.sender.userId.toString() }
-                    val time = java.time.Instant.ofEpochSecond(msg.time)
-                        .atZone(java.time.ZoneId.systemDefault())
-                        .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"))
-
-                    // 检测合并转发消息
-                    val forwardId = extractForwardId(msg.rawMessage)
-                    if (forwardId != null) {
-                        try {
-                            val forwardContent = napCat.getForwardMsg(forwardId)
-                            forwardMessages[forwardId] = forwardContent
-                            contextBuilder.appendLine("[$time] $nickname: [合并转发消息 id=$forwardId]")
-                        } catch (e: Exception) {
-                            logger.warn("Failed to get forward message {}: {}", forwardId, e.message)
-                            contextBuilder.appendLine("[$time] $nickname: ${msg.rawMessage}")
-                        }
-                    } else {
-                        contextBuilder.appendLine("[$time] $nickname: ${msg.rawMessage}")
-                    }
-                }
-
-                // 添加合并转发消息内容
-                if (forwardMessages.isNotEmpty()) {
-                    contextBuilder.appendLine()
-                    contextBuilder.appendLine("<forward>")
-                    forwardMessages.forEach { (id, messages) ->
-                        contextBuilder.appendLine("  <forward id=\"$id\">")
-                        messages.forEach { msg ->
-                            val nickname = members.find { it.userId == msg.sender.userId }?.let {
-                                it.card.ifEmpty { it.nickname }
-                            } ?: msg.sender.nickname.ifEmpty { msg.sender.userId.toString() }
+    private suspend fun processForwardSegments(text: String, forwardSegments: List<MessageSegment.Forward>): String {
+        var result = text
+        forwardSegments.forEach { forward ->
+            val forwardId = forward.id
+            try {
+                val forwardContent = napCat.getForwardMsg(forwardId)
+                if (forwardContent.isNotEmpty()) {
+                    val forwardText = buildString {
+                        appendLine("<forward id=\"$forwardId\">")
+                        forwardContent.forEach { msg ->
+                            val nickname = msg.sender.nickname.ifEmpty { msg.sender.userId.toString() }
                             val time = java.time.Instant.ofEpochSecond(msg.time)
                                 .atZone(java.time.ZoneId.systemDefault())
                                 .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"))
-                            contextBuilder.appendLine("    [$time] $nickname: ${msg.rawMessage}")
+                            appendLine("  [$time] $nickname: ${msg.rawMessage}")
                         }
-                        contextBuilder.appendLine("  </forward>")
+                        append("</forward>")
                     }
-                    contextBuilder.appendLine("</forward>")
+                    // 替换 CQ 码为实际内容
+                    result = result.replace("[CQ:forward,id=$forwardId]", forwardText)
                 }
+            } catch (e: Exception) {
+                logger.warn("Failed to get forward message {}: {}", forwardId, e.message)
+            }
+        }
+        return result
+    }
 
-                contextBuilder.appendLine("</context>")
-                contextBuilder.appendLine()
+    /**
+     * 构建带上下文的消息
+     *
+     * 在消息开头注入最近的群消息历史和环境信息
+     */
+    private suspend fun buildMessageWithContext(groupId: Long, userId: Long, text: String): String {
+        return try {
+            // 获取最近的群消息历史
+            val history = napCat.getGroupMsgHistory(groupId, count = 20)
+
+            // 构建上下文
+            val contextBuilder = StringBuilder()
+            contextBuilder.appendLine("<context>")
+
+            // 获取群成员列表用于获取昵称
+            val members = try {
+                napCat.getGroupMemberList(groupId)
+            } catch (e: Exception) {
+                emptyList()
             }
 
+            // 收集合并转发消息
+            val forwardMessages = mutableMapOf<String, List<ForwardMessage>>()
+
+            // 构建消息历史
+            history.reversed().forEach { msg ->
+                val nickname = members.find { it.userId == msg.userId }?.let {
+                    it.card.ifEmpty { it.nickname }
+                } ?: msg.sender.nickname.ifEmpty { msg.sender.userId.toString() }
+                val time = java.time.Instant.ofEpochSecond(msg.time)
+                    .atZone(java.time.ZoneId.systemDefault())
+                    .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"))
+
+                // 检测合并转发消息
+                val forwardId = extractForwardId(msg.rawMessage)
+                if (forwardId != null) {
+                    try {
+                        val forwardContent = napCat.getForwardMsg(forwardId)
+                        forwardMessages[forwardId] = forwardContent
+                        contextBuilder.appendLine("[$time] $nickname: [合并转发消息 id=$forwardId]")
+                    } catch (e: Exception) {
+                        logger.warn("Failed to get forward message {}: {}", forwardId, e.message)
+                        contextBuilder.appendLine("[$time] $nickname: ${msg.rawMessage}")
+                    }
+                } else {
+                    contextBuilder.appendLine("[$time] $nickname: ${msg.rawMessage}")
+                }
+            }
+
+            // 添加合并转发消息内容
+            if (forwardMessages.isNotEmpty()) {
+                contextBuilder.appendLine()
+                contextBuilder.appendLine("<forward>")
+                forwardMessages.forEach { (id, messages) ->
+                    contextBuilder.appendLine("  <forward id=\"$id\">")
+                    messages.forEach { msg ->
+                        val nickname = members.find { it.userId == msg.sender.userId }?.let {
+                            it.card.ifEmpty { it.nickname }
+                        } ?: msg.sender.nickname.ifEmpty { msg.sender.userId.toString() }
+                        val time = java.time.Instant.ofEpochSecond(msg.time)
+                            .atZone(java.time.ZoneId.systemDefault())
+                            .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"))
+                        contextBuilder.appendLine("    [$time] $nickname: ${msg.rawMessage}")
+                    }
+                    contextBuilder.appendLine("  </forward>")
+                }
+                contextBuilder.appendLine("</forward>")
+            }
+
+            contextBuilder.appendLine("</context>")
+            contextBuilder.appendLine()
             contextBuilder.appendLine("<environment>用户所在平台：QQ，请注意输出格式</environment>")
             contextBuilder.appendLine()
             contextBuilder.append(text)
