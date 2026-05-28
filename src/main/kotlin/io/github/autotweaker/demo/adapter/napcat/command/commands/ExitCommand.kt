@@ -18,10 +18,15 @@ class ExitCommand : Command {
     override val requiredRole = Role.USER
 
     override suspend fun execute(context: CommandContext): String {
-        return if (context.sessionManager.exitSession(context.userId)) {
-            "已退出当前会话"
-        } else {
-            "当前没有活跃会话"
+        val handle = context.sessionManager.getActiveSessionHandle(context.userId)
+            ?: return "当前没有活跃会话"
+
+        return try {
+            context.core.session.stop(handle.id)
+            context.sessionManager.exitSession(context.userId)
+            "已停止并退出会话"
+        } catch (e: Exception) {
+            "退出失败: ${e.message}"
         }
     }
 }

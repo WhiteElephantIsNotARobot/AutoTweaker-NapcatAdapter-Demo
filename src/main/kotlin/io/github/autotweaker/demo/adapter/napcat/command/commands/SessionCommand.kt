@@ -8,8 +8,8 @@ import io.github.autotweaker.demo.adapter.napcat.permission.Role
  * 会话管理命令
  *
  * 用户权限：
- *   /session - 列出当前用户的活跃会话
- *   /session list - 列出所有活跃会话（需要操作员权限）
+ *   /session - 列出当前用户的会话
+ *   /session list - 列出所有会话
  */
 class SessionCommand : Command {
 
@@ -53,31 +53,28 @@ class SessionCommand : Command {
         }
     }
 
-    private fun listAllSessions(context: CommandContext): String {
-        // 列出所有会话需要操作员权限
-        val role = context.role
-        if (role == null || role.ordinal > Role.OPERATOR.ordinal) {
-            return "权限不足，需要操作员角色"
+    private suspend fun listAllSessions(context: CommandContext): String {
+        val workspaces = context.core.session.listWorkspaces()
+        val allSessionIds = workspaces.flatMap { it.sessionIds.orEmpty() }
+        if (allSessionIds.isEmpty()) {
+            return "没有会话"
         }
 
-        val activeSessions = context.sessionManager.getAllActiveSessions()
-        if (activeSessions.isEmpty()) {
-            return "没有活跃的会话"
+        val sessions = context.core.session.loadData(allSessionIds)
+        if (sessions.isNullOrEmpty()) {
+            return "没有会话"
         }
+
+        val activeSessionId = context.sessionManager.getActiveSession(context.userId)
 
         return buildString {
-            appendLine("活跃会话:")
-            activeSessions.forEach { (userId, sessionId) ->
-                val handle = context.core.session.getHandle(sessionId)
-                if (handle != null) {
-                    val data = handle.data.value
-                    val workspace = context.core.session.listWorkspaces()
-                        .find { it.meta.id == data.workspaceId }
-                    appendLine("  用户 $userId:")
-                    appendLine("    会话ID: ${data.id}")
-                    appendLine("    标题: ${data.title ?: "未设置"}")
-                    appendLine("    工作区: ${workspace?.meta?.displayName ?: "未知"}")
-                }
+            appendLine("所有会话:")
+            sessions.forEach { data ->
+                val workspace = workspaces.find { it.meta.id == data.workspaceId }
+                val active = if (data.id == activeSessionId) " ← 当前" else ""
+                appendLine("  ${data.title ?: "未设置"}$active")
+                appendLine("    ID: ${data.id}")
+                appendLine("    工作区: ${workspace?.meta?.displayName ?: "未知"}")
             }
         }
     }
