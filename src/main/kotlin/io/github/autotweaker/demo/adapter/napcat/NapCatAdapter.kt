@@ -177,8 +177,6 @@ class NapCatAdapter : Adapter {
         wsClient = null
         messageBridge = null
         adapterScope = null
-        _core = null
-        _napCatApi = null
         logger.info("NapCat adapter stopped")
     }
 }
