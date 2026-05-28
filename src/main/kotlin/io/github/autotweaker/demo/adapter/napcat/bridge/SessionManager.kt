@@ -14,6 +14,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * 会话映射管理器
@@ -49,8 +50,8 @@ class SessionManager(
     /** userId → 主模型 ID（每用户隔离） */
     private val userPrimaryModels = ConcurrentHashMap<Long, UUID>()
 
-    /** 全局备选模型列表（操作员管理） */
-    private val globalFallbackModels = mutableListOf<UUID>()
+    /** 全局备选模型列表（操作员管理），线程安全 */
+    private val globalFallbackModels = CopyOnWriteArrayList<UUID>()
 
     /** 全局压缩模型（操作员管理） */
     @Volatile
