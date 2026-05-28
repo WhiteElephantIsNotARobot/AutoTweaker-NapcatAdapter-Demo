@@ -9,6 +9,7 @@ import io.github.autotweaker.demo.adapter.napcat.api.NapCatApi
 import io.github.autotweaker.demo.adapter.napcat.command.CommandContext
 import io.github.autotweaker.demo.adapter.napcat.command.CommandRegistry
 import io.github.autotweaker.demo.adapter.napcat.model.data.ForwardMessage
+import io.github.autotweaker.demo.adapter.napcat.model.message.MessageChain
 import io.github.autotweaker.demo.adapter.napcat.model.event.GroupMessageEvent
 import io.github.autotweaker.demo.adapter.napcat.model.event.MessageEvent
 import io.github.autotweaker.demo.adapter.napcat.model.event.PrivateMessageEvent
@@ -112,8 +113,8 @@ class MessageBridge(
             return
         }
 
-        // 普通消息，转发到活跃会话
-        forwardToSession(userId, groupId, text)
+        // 普通消息，转发到活跃会话（传递消息链用于检测合并转发）
+        forwardToSession(userId, groupId, text, event.message)
     }
 
     private suspend fun handlePrivateMessage(event: PrivateMessageEvent) {
@@ -138,8 +139,8 @@ class MessageBridge(
             return
         }
 
-        // 普通消息，转发到活跃会话
-        forwardToSession(userId, null, text)
+        // 普通消息，转发到活跃会话（传递消息链用于检测合并转发）
+        forwardToSession(userId, null, text, event.message)
     }
 
     /**
@@ -160,7 +161,7 @@ class MessageBridge(
         return text.ifEmpty { null }
     }
 
-    private suspend fun forwardToSession(userId: Long, groupId: Long?, text: String) {
+    private suspend fun forwardToSession(userId: Long, groupId: Long?, text: String, messageChain: MessageChain? = null) {
         var handle = sessionManager.getActiveSessionHandle(userId)
 
         // 无活跃会话，自动创建
@@ -185,8 +186,13 @@ class MessageBridge(
         pendingToolCalls.remove(handle.id)
 
         try {
-            // 处理当前消息中的合并转发
-            val processedText = processForwardInText(text)
+            // 检测消息链中的合并转发
+            val forwardSegments = messageChain?.filterIsInstance<MessageSegment.Forward>() ?: emptyList()
+            val processedText = if (forwardSegments.isNotEmpty()) {
+                processForwardSegments(text, forwardSegments)
+            } else {
+                text
+            }
 
             // 构建带上下文的消息
             val messageWithContext = if (groupId != null) {
@@ -202,19 +208,14 @@ class MessageBridge(
     }
 
     /**
-     * 处理文本中的合并转发消息
+     * 处理消息链中的合并转发段
      *
-     * 检测 [CQ:forward,id=xxx] 并获取实际内容
+     * 从消息链中提取 Forward 段，获取实际内容并替换到文本中
      */
-    private suspend fun processForwardInText(text: String): String {
-        val pattern = "\\[CQ:forward,id=(\\d+)\\]".toRegex()
-        val matches = pattern.findAll(text).toList()
-        if (matches.isEmpty()) return text
-
-        val result = StringBuilder(text)
-        var offset = 0
-        matches.forEach { match ->
-            val forwardId = match.groupValues[1]
+    private suspend fun processForwardSegments(text: String, forwardSegments: List<MessageSegment.Forward>): String {
+        var result = text
+        forwardSegments.forEach { forward ->
+            val forwardId = forward.id
             try {
                 val forwardContent = napCat.getForwardMsg(forwardId)
                 if (forwardContent.isNotEmpty()) {
@@ -230,16 +231,13 @@ class MessageBridge(
                         append("</forward>")
                     }
                     // 替换 CQ 码为实际内容
-                    val start = match.range.first + offset
-                    val end = match.range.last + 1 + offset
-                    result.replace(start, end, forwardText)
-                    offset += forwardText.length - (end - start)
+                    result = result.replace("[CQ:forward,id=$forwardId]", forwardText)
                 }
             } catch (e: Exception) {
                 logger.warn("Failed to get forward message {}: {}", forwardId, e.message)
             }
         }
-        return result.toString()
+        return result
     }
 
     /**
