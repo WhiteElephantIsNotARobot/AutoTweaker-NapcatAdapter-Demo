@@ -57,9 +57,6 @@ class MessageBridge(
     /** 会话 → 消息发送上下文的映射，用于回复路由 */
     private val sessionContexts = ConcurrentHashMap<UUID, MessageContext>()
 
-    /** 会话 → 最新消息时间戳，用于记录用户发送消息时间 */
-    private val lastMessageTimestamps = ConcurrentHashMap<UUID, Long>()
-
     /** 会话 → 上次上下文消息 ID 集合，用于检测新增消息 */
     private val lastMessageIds = ConcurrentHashMap<UUID, Set<UUID>>()
 
@@ -177,7 +174,6 @@ class MessageBridge(
 
         // 记录会话上下文，用于回复路由
         sessionContexts[handle.id] = MessageContext(userId, groupId)
-        lastMessageTimestamps[handle.id] = System.currentTimeMillis()
 
         // 确保监听器已启动
         ensureListeners(handle.id)
@@ -279,12 +275,15 @@ class MessageBridge(
      * 监听会话上下文变化
      *
      * 当上下文更新时，检测新增的 AI 消息并发送。
-     * 只要有新增消息就发送，不设时间阈值。
+     * 先更新状态再加载消息，避免竞态条件导致重复发送。
      */
     private suspend fun listenToContext(sessionId: UUID, context: StateFlow<SessionContext>) {
         context.collect { sessionContext ->
             val currentIds = getAllMessageIds(sessionContext.index)
             val previousIds = lastMessageIds[sessionId] ?: emptySet()
+
+            // 先更新状态，避免竞态条件
+            lastMessageIds[sessionId] = currentIds
 
             // 找出新增的消息 ID
             val newIds = currentIds - previousIds
@@ -299,9 +298,6 @@ class MessageBridge(
                     }
                 }
             }
-
-            // 更新状态
-            lastMessageIds[sessionId] = currentIds
         }
     }
 
