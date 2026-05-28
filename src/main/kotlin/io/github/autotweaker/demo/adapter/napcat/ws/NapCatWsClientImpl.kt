@@ -445,6 +445,23 @@ class NapCatWsClientImpl(
         return callApiAndDecode("get_file", params, FileInfo.serializer())
     }
 
+    override suspend fun getForwardMsg(id: String): List<ForwardMessage> {
+        val params = buildMap {
+            put("id", json.encodeToJsonElement(id))
+        }
+        val response = callApi("get_forward_msg", params)
+        val data = response["data"]?.jsonObject ?: return emptyList()
+        val messages = data["messages"]?.jsonArray ?: return emptyList()
+        return messages.mapNotNull { element ->
+            try {
+                json.decodeFromJsonElement(ForwardMessage.serializer(), element)
+            } catch (e: Exception) {
+                logger.debug("Failed to parse forward message: {}", e.message)
+                null
+            }
+        }
+    }
+
     // 事件订阅
     override fun onEvent(handler: suspend (OneBotEvent) -> Unit) {
         eventHandlers.add(handler)

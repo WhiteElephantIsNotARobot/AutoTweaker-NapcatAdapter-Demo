@@ -8,6 +8,7 @@ import io.github.autotweaker.api.types.session.SessionOutput
 import io.github.autotweaker.demo.adapter.napcat.api.NapCatApi
 import io.github.autotweaker.demo.adapter.napcat.command.CommandContext
 import io.github.autotweaker.demo.adapter.napcat.command.CommandRegistry
+import io.github.autotweaker.demo.adapter.napcat.model.data.ForwardMessage
 import io.github.autotweaker.demo.adapter.napcat.model.event.GroupMessageEvent
 import io.github.autotweaker.demo.adapter.napcat.model.event.MessageEvent
 import io.github.autotweaker.demo.adapter.napcat.model.event.PrivateMessageEvent
@@ -117,9 +118,7 @@ class MessageBridge(
 
     private suspend fun handlePrivateMessage(event: PrivateMessageEvent) {
         val userId = event.userId
-        val text = event.message.filterIsInstance<MessageSegment.Text>()
-            .joinToString("") { it.text }
-            .trim()
+        val text = event.rawMessage.trim()
 
         if (text.isEmpty()) return
 
@@ -220,6 +219,9 @@ class MessageBridge(
                 emptyList()
             }
 
+            // 收集合并转发消息
+            val forwardMessages = mutableMapOf<String, List<ForwardMessage>>()
+
             // 构建消息历史
             history.reversed().forEach { msg ->
                 val nickname = members.find { it.userId == msg.userId }?.let {
@@ -228,7 +230,41 @@ class MessageBridge(
                 val time = java.time.Instant.ofEpochSecond(msg.time)
                     .atZone(java.time.ZoneId.systemDefault())
                     .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"))
-                contextBuilder.appendLine("[$time] $nickname: ${msg.rawMessage}")
+
+                // 检测合并转发消息
+                val forwardId = extractForwardId(msg.rawMessage)
+                if (forwardId != null) {
+                    try {
+                        val forwardContent = napCat.getForwardMsg(forwardId)
+                        forwardMessages[forwardId] = forwardContent
+                        contextBuilder.appendLine("[$time] $nickname: [合并转发消息 id=$forwardId]")
+                    } catch (e: Exception) {
+                        logger.warn("Failed to get forward message {}: {}", forwardId, e.message)
+                        contextBuilder.appendLine("[$time] $nickname: ${msg.rawMessage}")
+                    }
+                } else {
+                    contextBuilder.appendLine("[$time] $nickname: ${msg.rawMessage}")
+                }
+            }
+
+            // 添加合并转发消息内容
+            if (forwardMessages.isNotEmpty()) {
+                contextBuilder.appendLine()
+                contextBuilder.appendLine("<forward>")
+                forwardMessages.forEach { (id, messages) ->
+                    contextBuilder.appendLine("  <forward id=\"$id\">")
+                    messages.forEach { msg ->
+                        val nickname = members.find { it.userId == msg.sender.userId }?.let {
+                            it.card.ifEmpty { it.nickname }
+                        } ?: msg.sender.nickname.ifEmpty { msg.sender.userId.toString() }
+                        val time = java.time.Instant.ofEpochSecond(msg.time)
+                            .atZone(java.time.ZoneId.systemDefault())
+                            .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"))
+                        contextBuilder.appendLine("    [$time] $nickname: ${msg.rawMessage}")
+                    }
+                    contextBuilder.appendLine("  </forward>")
+                }
+                contextBuilder.appendLine("</forward>")
             }
 
             contextBuilder.appendLine("</context>")
@@ -243,6 +279,17 @@ class MessageBridge(
             // 失败时只发送原始消息
             text
         }
+    }
+
+    /**
+     * 从 raw_message 中提取合并转发消息 ID
+     *
+     * @param rawMessage 原始消息文本
+     * @return 合并转发消息 ID，如果不是合并转发消息返回 null
+     */
+    private fun extractForwardId(rawMessage: String): String? {
+        val pattern = "\\[CQ:forward,id=(\\d+)\\]".toRegex()
+        return pattern.find(rawMessage)?.groupValues?.get(1)
     }
 
     /**

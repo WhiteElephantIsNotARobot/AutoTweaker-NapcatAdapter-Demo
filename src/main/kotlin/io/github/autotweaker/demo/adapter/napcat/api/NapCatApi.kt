@@ -192,4 +192,14 @@ interface NapCatApi {
      * @return 文件信息 [FileInfo]
      */
     suspend fun getFile(file: String): FileInfo
+
+    // ==================== 合并转发 API ====================
+
+    /**
+     * 获取合并转发消息
+     *
+     * @param id 合并转发消息 ID
+     * @return 合并转发消息列表
+     */
+    suspend fun getForwardMsg(id: String): List<ForwardMessage>
 }
