@@ -13,6 +13,7 @@ import io.github.autotweaker.demo.adapter.napcat.permission.Role
  *   /thinking off - 关闭 thinking
  *
  * thinking 状态跟随用户，持久化存储。
+ * 若当前有活跃会话，会同时更新会话配置使其即时生效。
  */
 class ThinkingCommand : Command {
 
@@ -38,9 +39,18 @@ class ThinkingCommand : Command {
         return "思考模式: ${if (enabled) "开启" else "关闭"}\n用法: /thinking [on|off]"
     }
 
-    private fun setThinking(context: CommandContext, enabled: Boolean): String {
+    private suspend fun setThinking(context: CommandContext, enabled: Boolean): String {
         context.sessionManager.setUserThinking(context.userId, enabled)
         val state = if (enabled) "开启" else "关闭"
-        return "思考模式已$state\n新会话将生效，当前会话请使用 /new 创建新会话"
+
+        // 若有活跃会话，同步更新配置
+        val handle = context.sessionManager.getActiveSessionHandle(context.userId)
+        if (handle != null) {
+            val config = handle.data.value.config
+            context.core.session.updateConfig(handle.id, config.copy(thinking = enabled))
+            return "思考模式已$state，当前会话已生效"
+        }
+
+        return "思考模式已$state"
     }
 }

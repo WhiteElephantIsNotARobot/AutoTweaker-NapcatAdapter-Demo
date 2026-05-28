@@ -181,13 +181,22 @@ class ModelCommand : Command {
         }
     }
 
-    private fun setUserPrimaryModel(context: CommandContext): String {
+    private suspend fun setUserPrimaryModel(context: CommandContext): String {
         if (context.args.size < 2) return "用法: /model set <名称|序号>"
 
         val modelId = resolveModelId(context, context.args[1])
             ?: return "未找到模型: ${context.args[1]}"
 
         context.sessionManager.setUserPrimaryModel(context.userId, modelId)
+
+        // 若有活跃会话，同步更新配置
+        val handle = context.sessionManager.getActiveSessionHandle(context.userId)
+        if (handle != null) {
+            val config = handle.data.value.config
+            context.core.session.updateConfig(handle.id, config.copy(model = modelId))
+            return "我的主模型已设置为: ${getModelDisplayName(context, modelId)}，当前会话已生效"
+        }
+
         return "我的主模型已设置为: ${getModelDisplayName(context, modelId)}"
     }
 
