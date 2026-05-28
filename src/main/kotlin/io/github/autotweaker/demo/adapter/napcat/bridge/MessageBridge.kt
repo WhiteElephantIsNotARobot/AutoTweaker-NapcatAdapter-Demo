@@ -167,6 +167,7 @@ class MessageBridge(
                 handle = sessionManager.autoCreateSession(userId)
                 sendReply(groupId, userId, "已自动创建并进入会话")
             } catch (e: Exception) {
+                logger.error("Failed to auto-create session for user {}", userId, e)
                 sendReply(groupId, userId, "无法自动创建会话: ${e.message}")
                 return
             }
