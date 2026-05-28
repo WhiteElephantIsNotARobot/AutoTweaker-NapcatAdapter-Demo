@@ -148,6 +148,15 @@ fun addProvider(provider: CoreConfig.ProviderConfig.Provider)
 
 添加 Provider。
 
+**异常：**
+
+| 异常 | 条件 |
+|------|------|
+| `IllegalArgumentException("Unknown LLM provider: ...")` | Provider 类型未注册 |
+| `IllegalArgumentException("Key ... not found")` | Key 名称不存在 |
+| `error("already exists id=...")` | Provider ID 重复 |
+| `error("Workspace with name ... already exists")` | Provider 显示名称重复 |
+
 ### removeProvider
 
 ```kotlin
@@ -156,17 +165,84 @@ fun removeProvider(id: UUID)
 
 删除 Provider。
 
-### setProviderType / setProviderKey / setProviderUrl / setProviderRule / setProviderDisplayName
+**异常：**
+
+| 异常 | 条件 |
+|------|------|
+| `error("ProviderData ... not found")` | Provider ID 不存在 |
+
+### setProviderType
 
 ```kotlin
 fun setProviderType(id: UUID, type: String)
+```
+
+更新 Provider 类型。
+
+**异常：**
+
+| 异常 | 条件 |
+|------|------|
+| `IllegalArgumentException("Unknown LLM provider: ...")` | 新类型未注册 |
+| `error("ProviderData ... not found")` | Provider ID 不存在 |
+
+### setProviderKey
+
+```kotlin
 fun setProviderKey(id: UUID, keyName: String)
+```
+
+更新 Provider 的 API Key。
+
+**异常：**
+
+| 异常 | 条件 |
+|------|------|
+| `error("Key ... not found")` | Key 名称不存在 |
+| `error("ProviderData ... not found")` | Provider ID 不存在 |
+
+### setProviderUrl
+
+```kotlin
 fun setProviderUrl(id: UUID, url: Url)
+```
+
+更新 Provider 的 URL。
+
+**异常：**
+
+| 异常 | 条件 |
+|------|------|
+| `error("ProviderData ... not found")` | Provider ID 不存在 |
+
+### setProviderRule
+
+```kotlin
 fun setProviderRule(id: UUID, rules: List<ProviderData.ErrorHandlingRule>)
+```
+
+更新 Provider 的错误处理规则。
+
+**异常：**
+
+| 异常 | 条件 |
+|------|------|
+| `error("ProviderData ... not found")` | Provider ID 不存在 |
+
+### setProviderDisplayName
+
+```kotlin
 fun setProviderDisplayName(id: UUID, displayName: String)
 ```
 
-更新 Provider 的各个属性。
+更新 Provider 的显示名称。
+
+**异常：**
+
+| 异常 | 条件 |
+|------|------|
+| `error("ProviderData ... not found")` | Provider ID 不存在 |
+| `IllegalArgumentException` | 显示名称已存在 |
 
 ## Model 管理
 
@@ -204,6 +280,13 @@ fun addModel(model: CoreConfig.ProviderConfig.Model)
 
 添加模型。
 
+**异常：**
+
+| 异常 | 条件 |
+|------|------|
+| `IllegalArgumentException` | 模型显示名称已存在 |
+| `error("already exists id=...")` | 模型 ID 重复 |
+
 ### removeModel
 
 ```kotlin
@@ -220,6 +303,12 @@ fun updateModelData(id: UUID, model: CoreConfig.ProviderConfig.Model)
 
 更新模型数据。
 
+**异常：**
+
+| 异常 | 条件 |
+|------|------|
+| `IllegalArgumentException` | 模型显示名称已存在（排除自身） |
+
 ## API Key 管理
 
 ### addApiKey
@@ -230,6 +319,13 @@ fun addApiKey(key: CoreConfig.ProviderConfig.ApiKey)
 
 添加 API Key。
 
+**异常：**
+
+| 异常 | 条件 |
+|------|------|
+| `error("Key ... already exists")` | Key 名称已存在 |
+| `check("SecretManager is locked.")` | 密钥管理器未解锁 |
+
 ### removeApiKey
 
 ```kotlin
@@ -237,6 +333,13 @@ fun removeApiKey(name: String)
 ```
 
 删除 API Key。
+
+**异常：**
+
+| 异常 | 条件 |
+|------|------|
+| `error("Key ... not found")` | Key 名称不存在 |
+| `check("SecretManager is locked.")` | 密钥管理器未解锁 |
 
 ### listApiKeyNames
 

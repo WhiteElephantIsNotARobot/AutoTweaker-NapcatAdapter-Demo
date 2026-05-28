@@ -343,18 +343,14 @@ data class ToolCallRequest(
 ```kotlin
 @Serializable
 data class WorkspaceData(
-    val id: UUID = UUID.randomUUID(),
     val meta: WorkspaceMeta,
-    val git: Boolean? = null,
     val sessionIds: List<UUID>? = null
 )
 ```
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `id` | `UUID` | 工作区 ID |
-| `meta` | `WorkspaceMeta` | 元数据 |
-| `git` | `Boolean?` | 是否是 Git 工作区 |
+| `meta` | `WorkspaceMeta` | 元数据（含 ID） |
 | `sessionIds` | `List<UUID>?` | 关联的会话 ID 列表 |
 
 ---
@@ -366,7 +362,8 @@ data class WorkspaceData(
 ```kotlin
 @Serializable
 data class WorkspaceMeta(
-    val name: String,
+    val displayName: String,
+    val id: UUID = UUID.randomUUID(),
     val inContainer: Boolean,
     val path: Path
 )
@@ -374,7 +371,8 @@ data class WorkspaceMeta(
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `name` | `String` | 工作区名称 |
+| `displayName` | `String` | 工作区显示名称 |
+| `id` | `UUID` | 工作区 ID |
 | `inContainer` | `Boolean` | 是否在容器中运行 |
 | `path` | `Path` | 工作区路径 |
 

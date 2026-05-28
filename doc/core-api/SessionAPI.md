@@ -65,6 +65,9 @@ suspend fun create(workspaceId: UUID, config: SessionConfig): SessionHandle
 | 异常 | 条件 |
 |------|------|
 | `IllegalStateException("Workspace not found: ...")` | 工作区 ID 不存在 |
+| `error("Unknown model: ...")` | 模型 ID 不存在 |
+| `require("Duplicate CoreTool: ...")` | 存在重复的 CoreTool 名称 |
+| `check("SecretManager is locked.")` | 密钥管理器未解锁 |
 
 **副作用：**
 
@@ -270,10 +273,8 @@ fun createWorkspace(meta: WorkspaceMeta): WorkspaceData
 | 异常 | 条件 |
 |------|------|
 | `IllegalStateException("... is not a directory")` | 路径不是目录 |
-
-**副作用：**
-
-- 若路径下存在 `.git` 目录，自动标记为 Git 工作区
+| `error("Workspace with name ... already exists")` | 工作区显示名称重复 |
+| `error("already exists id=...")` | 工作区 ID 重复 |
 
 ### renameWorkspace
 
@@ -282,6 +283,12 @@ suspend fun renameWorkspace(id: UUID, newName: String)
 ```
 
 重命名工作区。
+
+**异常：**
+
+| 异常 | 条件 |
+|------|------|
+| `error("Workspace not found: ...")` | 工作区 ID 不存在 |
 
 **副作用：**
 
@@ -294,6 +301,13 @@ suspend fun deleteWorkspace(id: UUID)
 ```
 
 删除工作区。
+
+**异常：**
+
+| 异常 | 条件 |
+|------|------|
+| `error("Workspace not found: ...")` | 工作区 ID 不存在 |
+| `error("Cannot delete default workspace")` | 不能删除默认工作区 |
 
 **副作用：**
 
