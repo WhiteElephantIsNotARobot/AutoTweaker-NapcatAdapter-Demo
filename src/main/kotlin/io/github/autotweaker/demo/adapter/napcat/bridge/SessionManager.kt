@@ -37,6 +37,7 @@ class SessionManager(
     companion object {
         private const val SESSION_MAP_KEY = "session_map"
         private const val USER_MODELS_KEY = "user_models"
+        private const val USER_WORKSPACES_KEY = "user_workspaces"
         private const val GLOBAL_CONFIG_KEY = "global_config"
     }
 
@@ -49,6 +50,9 @@ class SessionManager(
 
     /** userId → 主模型 ID（每用户隔离） */
     private val userPrimaryModels = ConcurrentHashMap<Long, UUID>()
+
+    /** userId → 选择的工作区 ID（每用户隔离） */
+    private val userSelectedWorkspaces = ConcurrentHashMap<Long, UUID>()
 
     /** 全局备选模型列表（操作员管理），线程安全 */
     private val globalFallbackModels = CopyOnWriteArrayList<UUID>()
@@ -100,6 +104,28 @@ class SessionManager(
         userPrimaryModels[userId] = modelId
         saveToStore()
         logger.info("User {} primary model set to {}", userId, modelId)
+    }
+
+    // ==================== 用户工作区选择（每用户隔离） ====================
+
+    /**
+     * 获取用户选择的工作区 ID
+     *
+     * @param userId QQ 号
+     * @return 工作区 ID，未选择返回 null
+     */
+    fun getUserWorkspace(userId: Long): UUID? = userSelectedWorkspaces[userId]
+
+    /**
+     * 设置用户选择的工作区
+     *
+     * @param userId QQ 号
+     * @param workspaceId 工作区 ID
+     */
+    fun setUserWorkspace(userId: Long, workspaceId: UUID) {
+        userSelectedWorkspaces[userId] = workspaceId
+        saveToStore()
+        logger.info("User {} selected workspace {}", userId, workspaceId)
     }
 
     // ==================== 全局模型配置（操作员管理） ====================
@@ -163,12 +189,21 @@ class SessionManager(
             core.session.create(config)
         } else {
             // 无非容器权限：只能用容器内工作区
-            val workspaces = core.session.listWorkspaces()
+            val containerWorkspaces = core.session.listWorkspaces()
                 .filter { it.meta.inContainer }
-            if (workspaces.isEmpty()) {
+            if (containerWorkspaces.isEmpty()) {
                 throw IllegalStateException("没有可用的容器工作区，请联系操作员创建")
             }
-            core.session.create(workspaces.first().id, config)
+
+            // 优先使用用户选择的工作区
+            val selectedWorkspaceId = userSelectedWorkspaces[userId]
+            val workspace = if (selectedWorkspaceId != null) {
+                containerWorkspaces.find { it.id == selectedWorkspaceId }
+                    ?: containerWorkspaces.first()
+            } else {
+                containerWorkspaces.first()
+            }
+            core.session.create(workspace.id, config)
         }
 
         core.session.updateTitle(handle.id, title)
@@ -231,9 +266,11 @@ class SessionManager(
 
             obj[SESSION_MAP_KEY]?.let { loadSessionMap(it) }
             obj[USER_MODELS_KEY]?.let { loadUserModels(it) }
+            obj[USER_WORKSPACES_KEY]?.let { loadUserWorkspaces(it) }
             obj[GLOBAL_CONFIG_KEY]?.let { loadGlobalConfig(it) }
 
-            logger.debug("Loaded {} sessions, {} user models", activeSessions.size, userPrimaryModels.size)
+            logger.debug("Loaded {} sessions, {} user models, {} user workspaces",
+                activeSessions.size, userPrimaryModels.size, userSelectedWorkspaces.size)
         } catch (e: Exception) {
             logger.warn("Failed to load from store", e)
         }
@@ -267,6 +304,20 @@ class SessionManager(
         }
     }
 
+    private fun loadUserWorkspaces(element: kotlinx.serialization.json.JsonElement) {
+        try {
+            element.jsonObject.forEach { (key, value) ->
+                try {
+                    userSelectedWorkspaces[key.toLong()] = UUID.fromString(value.jsonPrimitive.content)
+                } catch (e: Exception) {
+                    logger.warn("Failed to parse user workspace: {} -> {}", key, value)
+                }
+            }
+        } catch (e: Exception) {
+            logger.warn("Failed to load user workspaces", e)
+        }
+    }
+
     private fun loadGlobalConfig(element: kotlinx.serialization.json.JsonElement) {
         try {
             val obj = element.jsonObject
@@ -296,6 +347,11 @@ class SessionManager(
                 put(USER_MODELS_KEY, buildJsonObject {
                     userPrimaryModels.forEach { (userId, modelId) ->
                         put(userId.toString(), JsonPrimitive(modelId.toString()))
+                    }
+                })
+                put(USER_WORKSPACES_KEY, buildJsonObject {
+                    userSelectedWorkspaces.forEach { (userId, workspaceId) ->
+                        put(userId.toString(), JsonPrimitive(workspaceId.toString()))
                     }
                 })
                 put(GLOBAL_CONFIG_KEY, buildJsonObject {
