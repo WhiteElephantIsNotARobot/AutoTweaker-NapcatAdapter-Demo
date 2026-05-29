@@ -9,7 +9,7 @@ import io.github.autotweaker.demo.adapter.napcat.permission.Role
  * 审批工具调用请求
  *
  * 用法: /approve [序号] [理由]
- * 只有一个待审批工具时可省略序号。
+ * 无参数时审批所有待审批的工具调用。
  */
 class ApproveCommand : Command {
 
@@ -25,15 +25,23 @@ class ApproveCommand : Command {
         val pendingCount = context.messageBridge.getPendingCount(handle.id)
         if (pendingCount == 0) return "没有待审批的工具调用"
 
+        // 无参数：审批所有待审批的工具调用
+        if (context.args.isEmpty()) {
+            val callIds = context.messageBridge.getAllPendingCallIds(handle.id)
+            return try {
+                val approvals = callIds.map { ToolApprove(callId = it, approved = true) }
+                context.core.session.approveToolCall(handle.id, approvals)
+                context.messageBridge.clearPendingCalls(handle.id)
+                "已审批全部 ${callIds.size} 个工具调用"
+            } catch (e: Exception) {
+                "审批失败: ${e.message}"
+            }
+        }
+
         val index: Int
         val reason: String?
 
-        if (context.args.isEmpty()) {
-            // 无参数：只有一个待审批时自动选择
-            if (pendingCount > 1) return "有待审批的工具调用，请指定序号: /approve <序号>"
-            index = 1
-            reason = null
-        } else if (context.args[0].toIntOrNull() != null) {
+        if (context.args[0].toIntOrNull() != null) {
             // 第一个参数是序号
             index = context.args[0].toInt()
             reason = context.args.getOrNull(1)?.let { context.args.drop(1).joinToString(" ") }
@@ -50,6 +58,7 @@ class ApproveCommand : Command {
         return try {
             val approvals = listOf(ToolApprove(callId = callId, reason = reason, approved = true))
             context.core.session.approveToolCall(handle.id, approvals)
+            context.messageBridge.removePendingCall(handle.id, callId)
             "已审批工具调用: $callId"
         } catch (e: Exception) {
             "审批失败: ${e.message}"
