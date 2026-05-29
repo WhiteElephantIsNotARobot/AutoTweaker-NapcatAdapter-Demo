@@ -58,8 +58,9 @@ class NapCatWsClientImpl(
     override suspend fun connect(host: String, port: Int, token: String?) {
         if (connected.get()) return
 
+        val hostPart = if (host.contains(":")) "[$host]" else host
         val url = buildString {
-            append("ws://$host:$port")
+            append("ws://$hostPart:$port")
             if (token != null) append("?access_token=$token")
         }
 
