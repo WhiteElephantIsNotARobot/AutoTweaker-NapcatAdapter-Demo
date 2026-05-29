@@ -60,7 +60,7 @@ class NapCatWsClientImpl(
 
         val hostPart = if (host.contains(":")) "[$host]" else host
         val url = buildString {
-            append("ws://$hostPart:$port")
+            append("ws://$hostPart:$port/")
             if (token != null) append("?access_token=$token")
         }
 
