@@ -393,6 +393,20 @@ class MessageBridge(
     }
 
     /**
+     * 获取所有待审批工具调用的 callId 列表
+     */
+    fun getAllPendingCallIds(sessionId: UUID): List<String> {
+        return pendingToolCalls[sessionId] ?: emptyList()
+    }
+
+    /**
+     * 清除会话的所有待审批工具调用记录
+     */
+    fun clearPendingCalls(sessionId: UUID) {
+        pendingToolCalls.remove(sessionId)
+    }
+
+    /**
      * 移除已审批的工具调用记录
      */
     fun removePendingCall(sessionId: UUID, callId: String) {
@@ -463,7 +477,7 @@ class MessageBridge(
                             req.reason?.let { appendLine("     原因: $it") }
                         }
                         appendLine()
-                        appendLine("使用 /approve <序号> 审批")
+                        appendLine("使用 /approve 审批全部，或 /approve <序号> 审批单个")
                     }
                     sendToSession(sessionId, prompt)
                 }
