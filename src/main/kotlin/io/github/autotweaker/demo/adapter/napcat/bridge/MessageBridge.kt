@@ -304,8 +304,6 @@ class MessageBridge(
                 contextBuilder.appendLine("用户 QQ 号：$userId")
             }
             contextBuilder.appendLine("</session-info>")
-            contextBuilder.appendLine()
-
             // 构建上下文
             contextBuilder.appendLine("<context>")
 
@@ -331,7 +329,7 @@ class MessageBridge(
             val forwardMessages = mutableMapOf<String, List<ForwardMessage>>()
 
             // 构建消息历史
-            messages.reversed().forEach { msg ->
+            messages.forEach { msg ->
                 val nickname = if (groupId != null) {
                     members.find { it.userId == msg.userId }?.let {
                         it.card.ifEmpty { it.nickname }
@@ -384,9 +382,7 @@ class MessageBridge(
             }
 
             contextBuilder.appendLine("</context>")
-            contextBuilder.appendLine()
             contextBuilder.appendLine("<environment>用户所在平台：QQ，请注意输出格式</environment>")
-            contextBuilder.appendLine()
             contextBuilder.append(text)
 
             val result = contextBuilder.toString()
