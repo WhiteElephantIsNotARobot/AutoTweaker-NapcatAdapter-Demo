@@ -33,6 +33,7 @@ interface SessionAPI {
     fun getUsageSnapshots(): List<UsageSnapshot>
 
     // 工作区管理
+    val defaultWorkspaceId: UUID
     fun createWorkspace(meta: WorkspaceMeta): WorkspaceData
     fun renameWorkspace(id: UUID, newName: String)
     suspend fun deleteWorkspace(id: UUID)
@@ -281,6 +282,14 @@ fun getUsageSnapshots(): List<UsageSnapshot>
 
 ## 工作区管理
 
+### defaultWorkspaceId
+
+```kotlin
+val defaultWorkspaceId: UUID
+```
+
+默认工作区的 ID。`listWorkspaces()` 返回的工作区列表中不标识哪个是默认工作区，通过此属性可获取默认工作区 ID。
+
 ### isContainerRunning
 
 ```kotlin
@@ -349,14 +358,15 @@ suspend fun deleteWorkspace(id: UUID)
 
 **前置校验：**
 
-- 通过 `listWorkspaces()` 确认 `id` 存在且不是默认工作区
+- 通过 `listWorkspaces()` 确认 `id` 存在
+- 通过 `defaultWorkspaceId` 确认不是默认工作区
 
 **异常：**
 
 | 异常 | 条件 | 预防 |
 |------|------|------|
 | `IllegalStateException("Workspace not found: ...")` | 工作区 ID 不存在 | 先调用 `listWorkspaces()` |
-| `IllegalStateException("Cannot delete default workspace")` | 尝试删除默认工作区 | 检查是否为默认工作区 |
+| `IllegalStateException("Cannot delete default workspace")` | 尝试删除默认工作区 | 先检查 `id != defaultWorkspaceId` |
 
 **副作用：**
 
