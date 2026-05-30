@@ -47,7 +47,11 @@ class ThinkingCommand : Command {
         val handle = context.sessionManager.getActiveSessionHandle(context.userId)
         if (handle != null) {
             val config = handle.data.value.config
-            context.core.session.updateConfig(handle.id, config.copy(thinking = enabled))
+            try {
+                context.core.session.updateConfig(handle.id, config.copy(thinking = enabled))
+            } catch (_: Exception) {
+                // 会话可能已失效，不影响用户偏好已保存的事实
+            }
             return "思考模式已$state，当前会话已生效"
         }
 

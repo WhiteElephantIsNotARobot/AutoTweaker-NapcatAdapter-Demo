@@ -101,16 +101,22 @@ class ModelCommand : Command {
         val modelId = context.args[2]
         val displayName = context.args[3]
 
-        // 检查模型名称是否已存在
-        val existingModels = context.core.config.listModels()
-        if (existingModels.any { it.data.displayName.equals(displayName, ignoreCase = true) }) {
-            return "模型名称已存在: $displayName"
-        }
-
         // 查找提供商
         val provider = context.core.config.listProviders()
             .find { it.displayName.equals(providerName, ignoreCase = true) }
             ?: return "未找到提供商: $providerName"
+
+        // 检查提供商类型是否已注册
+        val availableTypes = context.core.config.listAvailableProviderTypes()
+        if (provider.type !in availableTypes) {
+            return "提供商类型未注册: ${provider.type}"
+        }
+
+        // 检查模型名称在同一提供商下是否已存在
+        val existingModels = context.core.config.listModels()
+        if (existingModels.any { it.data.providerId == provider.id && it.data.displayName.equals(displayName, ignoreCase = true) }) {
+            return "该提供商下模型名称已存在: $displayName"
+        }
 
         // 获取提供商元数据
         val providerMeta = try {

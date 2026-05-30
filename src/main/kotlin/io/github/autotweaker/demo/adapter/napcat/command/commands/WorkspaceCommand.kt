@@ -178,6 +178,10 @@ class WorkspaceCommand : Command {
 
         if (workspace == null) return "未找到工作区: $input"
 
+        if (workspace.meta.id == context.core.session.defaultWorkspaceId) {
+            return "不能删除默认工作区"
+        }
+
         return try {
             context.core.session.deleteWorkspace(workspace.meta.id)
             "已删除工作区: ${workspace.meta.displayName}"
