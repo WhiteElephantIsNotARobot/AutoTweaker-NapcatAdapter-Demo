@@ -53,4 +53,5 @@ class ThinkingCommand : Command {
 
         return "思考模式已$state"
     }
+
 }

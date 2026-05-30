@@ -29,14 +29,15 @@ class SessionCommand : Command {
         }
     }
 
-    private fun showMySession(context: CommandContext): String {
+    private suspend fun showMySession(context: CommandContext): String {
         val sessionId = context.sessionManager.getActiveSession(context.userId)
         if (sessionId == null) {
             return "你没有活跃的会话"
         }
 
-        val handle = context.core.session.getHandle(sessionId)
-        if (handle == null) {
+        val handle = try {
+            context.core.session.getHandle(sessionId)
+        } catch (e: Exception) {
             context.sessionManager.clearActiveSession(context.userId)
             return "你没有活跃的会话"
         }

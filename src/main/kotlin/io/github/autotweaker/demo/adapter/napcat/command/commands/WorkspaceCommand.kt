@@ -4,8 +4,8 @@ import io.github.autotweaker.api.types.session.WorkspaceMeta
 import io.github.autotweaker.demo.adapter.napcat.command.Command
 import io.github.autotweaker.demo.adapter.napcat.command.CommandContext
 import io.github.autotweaker.demo.adapter.napcat.permission.Role
+import java.nio.file.Path
 import java.nio.file.Paths
-import java.util.UUID
 
 /**
  * 工作区管理命令
@@ -15,14 +15,24 @@ import java.util.UUID
  *   /workspace select <名称|序号> - 选择工作区
  *
  * 操作员权限：
- *   /workspace create <名称> <路径> [container] - 创建工作区
+ *   /workspace create <名称> <路径> - 创建工作区
  *   /workspace delete <名称|序号> - 删除工作区
  */
 class WorkspaceCommand : Command {
 
+    companion object {
+        private val CONTAINER_WORKSPACE_PREFIX: Path = Path.of(
+            System.getProperty("user.home"), ".config", "autotweaker", "container", "workspace"
+        )
+
+        fun isContainerWorkspace(path: Path): Boolean =
+            path.startsWith(CONTAINER_WORKSPACE_PREFIX)
+    }
+
     override val name = "workspace"
     override val description = "管理工作区"
     override val usage = "/workspace [select|create|delete] [参数]"
+
     override val requiredRole = Role.USER
 
     override suspend fun execute(context: CommandContext): String {
@@ -47,19 +57,17 @@ class WorkspaceCommand : Command {
         val workspaces = if (hasNonContainer) {
             allWorkspaces
         } else {
-            allWorkspaces.filter { it.meta.inContainer }
+            allWorkspaces.filter { isContainerWorkspace(it.meta.path) }
         }
 
-        if (workspaces.isEmpty()) {
-            return "没有可用的工作区"
-        }
+        if (workspaces.isEmpty()) return "没有可用的工作区"
 
         val selectedId = context.sessionManager.getUserWorkspace(context.userId)
 
         return buildString {
             appendLine("可用工作区:")
             workspaces.forEachIndexed { index, ws ->
-                val container = if (ws.meta.inContainer) " [容器]" else " [非容器]"
+                val container = if (isContainerWorkspace(ws.meta.path)) " [容器]" else " [非容器]"
                 val selected = if (ws.meta.id == selectedId) " ← 当前" else ""
                 appendLine("  ${index + 1}. ${ws.meta.displayName}$container$selected")
             }
@@ -77,7 +85,7 @@ class WorkspaceCommand : Command {
         val workspaces = if (hasNonContainer) {
             allWorkspaces
         } else {
-            allWorkspaces.filter { it.meta.inContainer }
+            allWorkspaces.filter { isContainerWorkspace(it.meta.path) }
         }
 
         if (workspaces.isEmpty()) return "没有可用的工作区"
@@ -105,12 +113,15 @@ class WorkspaceCommand : Command {
         }
 
         if (context.args.size < 3) {
-            return "用法: /workspace create <名称> <路径> [container]"
+            return "用法: /workspace create <名称> <路径>"
+        }
+
+        if (context.args.size > 3) {
+            return "容器工作区现在从路径自动推断，不再支持 [container] 参数"
         }
 
         val name = context.args[1]
         val pathStr = context.args[2]
-        val inContainer = context.args.getOrNull(3)?.lowercase() == "container"
 
         // 检查工作区名称是否已存在
         val existingWorkspaces = context.core.session.listWorkspaces()
@@ -132,7 +143,6 @@ class WorkspaceCommand : Command {
         return try {
             val meta = WorkspaceMeta(
                 displayName = name,
-                inContainer = inContainer,
                 path = path
             )
             val workspace = context.core.session.createWorkspace(meta)

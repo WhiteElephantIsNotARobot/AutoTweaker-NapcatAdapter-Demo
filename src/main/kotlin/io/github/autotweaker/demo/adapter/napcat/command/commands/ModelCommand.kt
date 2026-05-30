@@ -78,7 +78,7 @@ class ModelCommand : Command {
             appendLine("可用模型:")
             models.forEachIndexed { index, model ->
                 val marker = if (model.data.id == userPrimary) " ← 我的主模型" else ""
-                val provider = model.data.providerId?.let { pid ->
+                val provider = model.data.providerId.let { pid ->
                     context.core.config.listProviders().find { it.id == pid }?.displayName
                 } ?: "未知"
                 appendLine("  ${index + 1}. [$provider] ${model.data.displayName}$marker")
