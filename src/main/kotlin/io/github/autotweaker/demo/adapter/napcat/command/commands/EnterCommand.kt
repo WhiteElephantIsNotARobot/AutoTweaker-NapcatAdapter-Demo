@@ -3,6 +3,7 @@ package io.github.autotweaker.demo.adapter.napcat.command.commands
 import io.github.autotweaker.demo.adapter.napcat.command.Command
 import io.github.autotweaker.demo.adapter.napcat.command.CommandContext
 import io.github.autotweaker.demo.adapter.napcat.permission.Role
+import org.slf4j.LoggerFactory
 import java.util.UUID
 
 /**
@@ -11,6 +12,8 @@ import java.util.UUID
  * 用法: /enter <sessionId>
  */
 class EnterCommand : Command {
+
+    private val logger = LoggerFactory.getLogger(EnterCommand::class.java)
 
     override val name = "enter"
     override val description = "进入指定会话"
@@ -31,7 +34,8 @@ class EnterCommand : Command {
         return try {
             context.sessionManager.enterSession(context.userId, sessionId)
             "已进入会话: $sessionId"
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            logger.warn("Failed to enter session", e)
             "会话不存在: $sessionId"
         }
     }

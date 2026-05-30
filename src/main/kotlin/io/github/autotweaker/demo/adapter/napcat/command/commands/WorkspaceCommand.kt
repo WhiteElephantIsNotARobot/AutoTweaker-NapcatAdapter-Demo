@@ -95,8 +95,11 @@ class WorkspaceCommand : Command {
         val workspace = if (index != null && index in 1..workspaces.size) {
             workspaces[index - 1]
         } else {
-            // 按名称查找
-            workspaces.find { it.meta.displayName.lowercase().contains(input.lowercase()) }
+            // 按名称查找：精确 > 前缀 > 包含
+            val lower = input.lowercase()
+            workspaces.find { it.meta.displayName.equals(lower, ignoreCase = true) }
+                ?: workspaces.find { it.meta.displayName.lowercase().startsWith(lower) }
+                ?: workspaces.find { it.meta.displayName.lowercase().contains(lower) }
         }
 
         if (workspace == null) return "未找到工作区: $input"
@@ -108,7 +111,7 @@ class WorkspaceCommand : Command {
     private fun createWorkspace(context: CommandContext): String {
         // 创建工作区需要操作员权限
         val role = context.role
-        if (role == null || role.ordinal > Role.OPERATOR.ordinal) {
+        if (role == null || role.level < Role.OPERATOR.level) {
             return "权限不足，需要操作员角色"
         }
 
@@ -130,9 +133,15 @@ class WorkspaceCommand : Command {
         }
 
         val path = try {
-            Paths.get(pathStr)
+            Paths.get(pathStr).toRealPath()
         } catch (e: Exception) {
             return "无效路径: $pathStr"
+        }
+
+        // 路径遍历防护：限制在用户主目录下
+        val homeDir = Paths.get(System.getProperty("user.home")).toRealPath()
+        if (!path.startsWith(homeDir)) {
+            return "工作区路径必须在用户主目录下"
         }
 
         // 验证路径存在且是目录
@@ -155,7 +164,7 @@ class WorkspaceCommand : Command {
     private suspend fun deleteWorkspace(context: CommandContext): String {
         // 删除工作区需要操作员权限
         val role = context.role
-        if (role == null || role.ordinal > Role.OPERATOR.ordinal) {
+        if (role == null || role.level < Role.OPERATOR.level) {
             return "权限不足，需要操作员角色"
         }
 
@@ -172,14 +181,23 @@ class WorkspaceCommand : Command {
         val workspace = if (index != null && index in 1..workspaces.size) {
             workspaces[index - 1]
         } else {
-            // 按名称查找
-            workspaces.find { it.meta.displayName.lowercase().contains(input.lowercase()) }
+            // 按名称查找：精确 > 前缀 > 包含
+            val lower = input.lowercase()
+            workspaces.find { it.meta.displayName.equals(lower, ignoreCase = true) }
+                ?: workspaces.find { it.meta.displayName.lowercase().startsWith(lower) }
+                ?: workspaces.find { it.meta.displayName.lowercase().contains(lower) }
         }
 
         if (workspace == null) return "未找到工作区: $input"
 
         if (workspace.meta.id == context.core.session.defaultWorkspaceId) {
             return "不能删除默认工作区"
+        }
+
+        // 检查工作区是否有关联会话
+        val sessionIds = workspace.sessionIds.orEmpty()
+        if (sessionIds.isNotEmpty()) {
+            return "该工作区下有 ${sessionIds.size} 个会话，请先删除或迁移会话后再删除工作区"
         }
 
         return try {

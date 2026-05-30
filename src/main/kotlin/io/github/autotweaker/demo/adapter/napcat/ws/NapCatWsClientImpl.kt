@@ -28,11 +28,11 @@ class NapCatWsClientImpl(
     json: Json = Json { ignoreUnknownKeys = true; isLenient = true }
 ) : NapCatApiImpl(json), NapCatWsClient {
 
-    private val logger = LoggerFactory.getLogger(NapCatWsClient::class.java)
+    private val logger = LoggerFactory.getLogger(NapCatWsClientImpl::class.java)
 
-    private var wsSession: WebSocketSession? = null
-    private var client: HttpClient? = null
-    private var connectJob: Job? = null
+    @Volatile private var wsSession: WebSocketSession? = null
+    @Volatile private var client: HttpClient? = null
+    @Volatile private var connectJob: Job? = null
     private val connected = AtomicBoolean(false)
     private val echoCounter = AtomicLong(0)
     private val pendingRequests = ConcurrentHashMap<String, Channel<JsonObject>>()
@@ -56,9 +56,11 @@ class NapCatWsClientImpl(
     // ==================== 连接管理 ====================
 
     override suspend fun connect(host: String, port: Int, token: String?) {
-        if (connected.get()) return
+        if (!connected.compareAndSet(false, true)) return
 
         val hostPart = if (host.contains(":")) "[$host]" else host
+        // WARNING: 使用 ws:// 非加密连接，建议在可信网络环境中使用
+        // WARNING: Token 通过 URL 参数传输，建议在可信网络环境中使用
         val url = buildString {
             append("ws://$hostPart:$port/")
             if (token != null) append("?access_token=$token")
@@ -74,7 +76,6 @@ class NapCatWsClientImpl(
             try {
                 client!!.webSocket(url) {
                     wsSession = this
-                    connected.set(true)
                     logger.info("Connected to NapCat WS at $host:$port")
                     logger.debug("WebSocket session established, closeReason: {}", closeReason)
                     connectHandler?.invoke()
@@ -115,12 +116,15 @@ class NapCatWsClientImpl(
 
     override suspend fun disconnect() {
         connected.set(false)
-        wsSession?.close()
+        val session = wsSession
+        wsSession = null
+        session?.close(CloseReason(CloseReason.Codes.NORMAL, "Client disconnect"))
         connectJob?.cancelAndJoin()
         client?.close()
         client = null
     }
 
+    /** 关闭连接，会阻塞当前线程。协程环境中请使用 [disconnect]。 */
     override fun close() {
         runBlocking { disconnect() }
     }
@@ -265,7 +269,7 @@ class NapCatWsClientImpl(
         val session = wsSession ?: throw NapCatApiException(-1, "Not connected")
         session.send(Frame.Text(request.toString()))
 
-        return withTimeout(30000) {
+        return withTimeout(CALL_API_TIMEOUT_MS) {
             try {
                 channel.receive()
             } finally {
@@ -315,6 +319,10 @@ class NapCatWsClientImpl(
 
     override fun onError(handler: (Throwable) -> Unit) {
         errorHandler = handler
+    }
+
+    companion object {
+        private const val CALL_API_TIMEOUT_MS = 30_000L
     }
 }
 

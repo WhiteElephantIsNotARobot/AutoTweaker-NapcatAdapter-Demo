@@ -22,11 +22,14 @@ class ExitCommand : Command {
             ?: return "当前没有活跃会话"
 
         return try {
-            context.core.session.stop(handle.id)
-            context.sessionManager.exitSession(context.userId)
+            try {
+                context.core.session.stop(handle.id)
+            } finally {
+                context.sessionManager.exitSession(context.userId)
+            }
             "已停止并退出会话"
         } catch (e: Exception) {
-            "退出失败: ${e.message}"
+            "退出失败，请稍后重试"
         }
     }
 }

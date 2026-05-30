@@ -69,6 +69,7 @@ class MessageBridge(
         when (event) {
             is GroupMessageEvent -> handleGroupMessage(event)
             is PrivateMessageEvent -> handlePrivateMessage(event)
+            else -> logger.debug("Unhandled message event type")
         }
     }
 
@@ -77,19 +78,17 @@ class MessageBridge(
         val groupId = event.groupId
         val selfId = event.selfId
 
-        // 单字符 "a" 快捷审批所有待审批工具调用（无需 @bot）
-        if (event.rawMessage.trim() == "a") {
-            val reply = tryApproveAll(userId)
-            if (reply != null) {
-                sendReply(groupId, userId, reply)
-                return
-            }
-        }
-
         // 检测 @bot
         val text = extractAtText(event.message, selfId)
         if (text == null) {
-            // 没有 @bot，忽略
+            // 没有 @bot，检查 "a" 快捷审批（需要授权）
+            if (event.rawMessage.trim() == "a") {
+                if (!permissionManager.isAuthorized(userId)) return
+                val reply = tryApproveAll(userId)
+                if (reply != null) {
+                    sendReply(groupId, userId, reply)
+                }
+            }
             return
         }
 
@@ -99,7 +98,7 @@ class MessageBridge(
             return
         }
 
-        logger.debug("Group message from user {} in group {}: {}", userId, groupId, text)
+        logger.debug("Group message from user {} in group {}, length={}", userId, groupId, text.length)
 
         // 尝试命令分发
         val context = createContext(userId, groupId)
@@ -134,7 +133,7 @@ class MessageBridge(
             }
         }
 
-        logger.debug("Private message from user {}: {}", userId, text)
+        logger.debug("Private message from user {}, length={}", userId, text.length)
 
         // 尝试命令分发
         val context = createContext(userId, null)
@@ -164,11 +163,10 @@ class MessageBridge(
     private fun extractAtText(message: List<MessageSegment>, selfId: Long): String? {
         if (message.isEmpty()) return null
 
-        val first = message[0]
-        if (first !is MessageSegment.At) return null
-        if (first.qq != selfId.toString()) return null
+        val atIndex = message.indexOfFirst { it is MessageSegment.At && it.qq == selfId.toString() }
+        if (atIndex < 0) return null
 
-        val text = message.drop(1)
+        val text = message.drop(atIndex + 1)
             .filterIsInstance<MessageSegment.Text>()
             .joinToString("") { it.text }
             .trim()
@@ -179,14 +177,15 @@ class MessageBridge(
     private suspend fun forwardToSession(userId: Long, groupId: Long?, text: String, messageChain: MessageChain? = null) {
         var handle = sessionManager.getActiveSessionHandle(userId)
 
-        // 无活跃会话，自动创建
+        // 无活跃会话，自动创建（清理旧会话上下文）
         if (handle == null) {
             try {
+                sessionManager.getActiveSession(userId)?.let { sessionContexts.remove(it) }
                 handle = sessionManager.autoCreateSession(userId)
                 sendReply(groupId, userId, "已自动创建并进入会话")
             } catch (e: Exception) {
                 logger.error("Failed to auto-create session for user {}", userId, e)
-                sendReply(groupId, userId, "无法自动创建会话: ${e.message}")
+                sendReply(groupId, userId, "无法自动创建会话，请稍后重试")
                 return
             }
         }
@@ -198,7 +197,7 @@ class MessageBridge(
         sessionListener.ensureListeners(handle.id)
 
         // 新消息开始新轮次，清除旧的待审批记录
-        sessionListener.pendingToolCalls.remove(handle.id)
+        sessionListener.clearPendingCalls(handle.id)
 
         try {
             // 检测消息链中的合并转发
@@ -214,7 +213,7 @@ class MessageBridge(
             core.session.send(handle.id, messageWithContext)
         } catch (e: Exception) {
             logger.error("Failed to send message to session {}", handle.id, e)
-            sendReply(groupId, userId, "发送失败: ${e.message}")
+            sendReply(groupId, userId, "消息发送失败，请稍后重试")
         }
     }
 

@@ -18,7 +18,7 @@ class NewCommand : Command {
     override val requiredRole = Role.USER
 
     override suspend fun execute(context: CommandContext): String {
-        val title = context.args.joinToString(" ").ifEmpty { "新会话" }
+        val title = context.args.joinToString(" ").take(100).ifEmpty { "新会话" }
 
         return try {
             val handle = context.sessionManager.autoCreateSession(context.userId, title)

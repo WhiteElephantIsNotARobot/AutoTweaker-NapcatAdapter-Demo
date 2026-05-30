@@ -2,6 +2,7 @@ package io.github.autotweaker.demo.adapter.napcat.model.data
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
 /**
  * 机器人登录信息
@@ -148,7 +149,7 @@ data class MessageDetail(
 @Serializable
 data class RawMessageSegment(
     val type: String,
-    val data: Map<String, String>? = null
+    val data: JsonObject? = null
 )
 
 /**

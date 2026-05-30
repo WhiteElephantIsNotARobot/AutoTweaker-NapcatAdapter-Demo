@@ -11,6 +11,10 @@ import org.slf4j.LoggerFactory
  */
 class CommandRegistry {
 
+    companion object {
+        private val WHITESPACE_REGEX = "\\s+".toRegex()
+    }
+
     private val logger = LoggerFactory.getLogger(CommandRegistry::class.java)
     private val commands = mutableMapOf<String, Command>()
 
@@ -52,7 +56,7 @@ class CommandRegistry {
         val trimmed = text.trim()
         if (!trimmed.startsWith("/")) return null
 
-        val parts = trimmed.split("\\s+".toRegex())
+        val parts = trimmed.split(WHITESPACE_REGEX)
         val name = parts[0].removePrefix("/").lowercase()
         val args = parts.drop(1)
 
@@ -76,7 +80,7 @@ class CommandRegistry {
         }
 
         val role = context.role
-        if (role == null || role.ordinal > command.requiredRole.ordinal) {
+        if (role == null || role.level < command.requiredRole.level) {
             return "权限不足，需要 ${command.requiredRole.name} 角色"
         }
 
@@ -84,7 +88,7 @@ class CommandRegistry {
             command.execute(context.copy(args = args))
         } catch (e: Exception) {
             logger.error("Command execution failed: /{}", name, e)
-            "命令执行失败: ${e.message}"
+            "命令执行失败，请稍后重试"
         }
     }
 }

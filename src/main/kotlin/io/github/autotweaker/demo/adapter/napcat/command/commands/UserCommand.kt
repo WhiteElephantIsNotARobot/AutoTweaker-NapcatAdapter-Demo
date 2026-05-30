@@ -43,6 +43,7 @@ class UserCommand : Command {
 
         val userId = context.args[1].toLongOrNull()
             ?: return "无效的 QQ 号: ${context.args[1]}"
+        if (userId <= 0) return "无效的 QQ 号"
 
         return if (context.permissionManager.addUser(userId)) {
             "已添加用户: $userId"
@@ -56,6 +57,8 @@ class UserCommand : Command {
 
         val userId = context.args[1].toLongOrNull()
             ?: return "无效的 QQ 号: ${context.args[1]}"
+        if (userId <= 0) return "无效的 QQ 号"
+        if (context.permissionManager.getRole(userId) == Role.ADMIN) return "不能移除管理员"
 
         return if (context.permissionManager.removeUser(userId)) {
             "已移除用户: $userId"

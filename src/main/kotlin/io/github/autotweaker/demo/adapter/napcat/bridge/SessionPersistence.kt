@@ -66,6 +66,7 @@ class SessionPersistence(
      * 将所有数据保存到存储
      */
     fun save() {
+      synchronized(this) {
         try {
             val obj = buildJsonObject {
                 put(SESSION_MAP_KEY, buildJsonObject {
@@ -101,62 +102,42 @@ class SessionPersistence(
         } catch (e: Exception) {
             logger.error("Failed to save to store", e)
         }
+      }
+    }
+
+    private fun <V> loadMap(
+        element: JsonElement,
+        key: String,
+        valueParser: (JsonElement) -> V,
+        target: ConcurrentHashMap<Long, V>
+    ) {
+        try {
+            element.jsonObject.forEach { (k, v) ->
+                try {
+                    target[k.toLong()] = valueParser(v)
+                } catch (e: Exception) {
+                    logger.warn("Failed to load entry {} from {}", k, key, e)
+                }
+            }
+        } catch (e: Exception) {
+            logger.warn("Failed to load {}", key, e)
+        }
     }
 
     private fun loadSessionMap(element: JsonElement) {
-        try {
-            element.jsonObject.forEach { (key, value) ->
-                try {
-                    activeSessions[key.toLong()] = UUID.fromString(value.jsonPrimitive.content)
-                } catch (e: Exception) {
-                    logger.warn("Failed to parse session: {} -> {}", key, value)
-                }
-            }
-        } catch (e: Exception) {
-            logger.warn("Failed to load session map", e)
-        }
+        loadMap(element, "session_map", { UUID.fromString(it.jsonPrimitive.content) }, activeSessions)
     }
 
     private fun loadUserModels(element: JsonElement) {
-        try {
-            element.jsonObject.forEach { (key, value) ->
-                try {
-                    userPrimaryModels[key.toLong()] = UUID.fromString(value.jsonPrimitive.content)
-                } catch (e: Exception) {
-                    logger.warn("Failed to parse user model: {} -> {}", key, value)
-                }
-            }
-        } catch (e: Exception) {
-            logger.warn("Failed to load user models", e)
-        }
+        loadMap(element, "user_models", { UUID.fromString(it.jsonPrimitive.content) }, userPrimaryModels)
     }
 
     private fun loadUserWorkspaces(element: JsonElement) {
-        try {
-            element.jsonObject.forEach { (key, value) ->
-                try {
-                    userSelectedWorkspaces[key.toLong()] = UUID.fromString(value.jsonPrimitive.content)
-                } catch (e: Exception) {
-                    logger.warn("Failed to parse user workspace: {} -> {}", key, value)
-                }
-            }
-        } catch (e: Exception) {
-            logger.warn("Failed to load user workspaces", e)
-        }
+        loadMap(element, "user_workspaces", { UUID.fromString(it.jsonPrimitive.content) }, userSelectedWorkspaces)
     }
 
     private fun loadUserThinking(element: JsonElement) {
-        try {
-            element.jsonObject.forEach { (key, value) ->
-                try {
-                    userThinking[key.toLong()] = value.jsonPrimitive.content.toBoolean()
-                } catch (e: Exception) {
-                    logger.warn("Failed to parse user thinking: {} -> {}", key, value)
-                }
-            }
-        } catch (e: Exception) {
-            logger.warn("Failed to load user thinking", e)
-        }
+        loadMap(element, "user_thinking", { it.jsonPrimitive.content.toBoolean() }, userThinking)
     }
 
     private fun loadGlobalConfig(element: JsonElement) {
@@ -168,12 +149,6 @@ class SessionPersistence(
                 } catch (e: Exception) {
                     logger.warn("Failed to parse fallback model: {}", it)
                 }
-            }
-            obj["summarize"]?.let {
-                // globalSummarizeModel is @Volatile in SessionManager, set directly
-                // We need a setter callback for this
-                // Actually we can't set it here since it's a val in SessionManager
-                // The load will be handled by SessionManager after persistence.load()
             }
         } catch (e: Exception) {
             logger.warn("Failed to load global config", e)

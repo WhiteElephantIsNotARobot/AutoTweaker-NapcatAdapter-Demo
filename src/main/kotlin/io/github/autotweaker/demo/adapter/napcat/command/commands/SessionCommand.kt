@@ -55,6 +55,13 @@ class SessionCommand : Command {
     }
 
     private suspend fun listAllSessions(context: CommandContext): String {
+        val role = context.permissionManager.getRole(context.userId)
+        if (role == null || role == Role.USER) {
+            // USER 只能查看自己的会话
+            val mySession = context.sessionManager.getActiveSession(context.userId)
+            return if (mySession != null) "当前会话: $mySession" else "没有活跃会话"
+        }
+
         val workspaces = context.core.session.listWorkspaces()
         val allSessionIds = workspaces.flatMap { it.sessionIds.orEmpty() }
         if (allSessionIds.isEmpty()) {

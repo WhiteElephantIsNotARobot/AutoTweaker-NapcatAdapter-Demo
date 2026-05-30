@@ -4,6 +4,7 @@ import io.github.autotweaker.api.types.agent.ToolApprove
 import io.github.autotweaker.demo.adapter.napcat.command.Command
 import io.github.autotweaker.demo.adapter.napcat.command.CommandContext
 import io.github.autotweaker.demo.adapter.napcat.permission.Role
+import org.slf4j.LoggerFactory
 
 /**
  * 拒绝工具调用请求
@@ -12,6 +13,8 @@ import io.github.autotweaker.demo.adapter.napcat.permission.Role
  * 只有一个待审批工具时可省略序号。
  */
 class RejectCommand : Command {
+
+    private val logger = LoggerFactory.getLogger(RejectCommand::class.java)
 
     override val name = "reject"
     override val description = "拒绝工具调用请求"
@@ -35,7 +38,7 @@ class RejectCommand : Command {
             reason = null
         } else if (context.args[0].toIntOrNull() != null) {
             // 第一个参数是序号
-            index = context.args[0].toInt()
+            index = context.args[0].toIntOrNull()!!
             reason = context.args.getOrNull(1)?.let { context.args.drop(1).joinToString(" ") }
         } else {
             // 第一个参数不是数字，当作理由（单个工具时）
@@ -44,15 +47,20 @@ class RejectCommand : Command {
             reason = context.args.joinToString(" ")
         }
 
-        val callId = context.messageBridge.getPendingCallId(handle.id, index)
-            ?: return "无效的序号: $index"
+        val callId = try {
+            context.messageBridge.getPendingCallId(handle.id, index)
+        } catch (e: Exception) {
+            logger.warn("Failed to get pending call id", e)
+            null
+        } ?: return "无效的序号: $index"
 
         return try {
             val approvals = listOf(ToolApprove(callId = callId, reason = reason, approved = false))
             context.core.session.approveToolCall(handle.id, approvals)
             "已拒绝工具调用: $callId"
         } catch (e: Exception) {
-            "拒绝失败: ${e.message}"
+            logger.error("Reject failed", e)
+            "拒绝失败，请稍后重试"
         }
     }
 }

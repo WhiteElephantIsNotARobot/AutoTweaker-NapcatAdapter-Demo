@@ -315,24 +315,32 @@ object QqToolFunctions {
 
     // ==================== JsonObject 参数提取扩展 ====================
 
-    fun JsonObject.string(key: String): String =
+    internal fun JsonObject.string(key: String): String =
         this[key]?.jsonPrimitive?.content ?: throw IllegalArgumentException("缺少参数: $key")
 
-    fun JsonObject.stringOrNull(key: String): String? =
+    internal fun JsonObject.stringOrNull(key: String): String? =
         this[key]?.jsonPrimitive?.contentOrNull
 
-    fun JsonObject.long(key: String): Long =
-        this[key]?.jsonPrimitive?.long ?: throw IllegalArgumentException("缺少参数: $key")
+    internal fun JsonObject.long(key: String): Long {
+        val value = this[key]?.jsonPrimitive?.content
+            ?: throw IllegalArgumentException("缺少参数: $key")
+        return value.toLongOrNull()
+            ?: throw IllegalArgumentException("参数 $key 必须是数字，实际值: $value")
+    }
 
-    fun JsonObject.int(key: String): Int =
-        this[key]?.jsonPrimitive?.int ?: throw IllegalArgumentException("缺少参数: $key")
+    internal fun JsonObject.int(key: String): Int {
+        val value = this[key]?.jsonPrimitive?.content
+            ?: throw IllegalArgumentException("缺少参数: $key")
+        return value.toIntOrNull()
+            ?: throw IllegalArgumentException("参数 $key 必须是数字，实际值: $value")
+    }
 
-    fun JsonObject.intOrDefault(key: String, default: Int): Int =
+    internal fun JsonObject.intOrDefault(key: String, default: Int): Int =
         this[key]?.jsonPrimitive?.intOrNull ?: default
 
-    fun JsonObject.boolean(key: String): Boolean =
+    internal fun JsonObject.boolean(key: String): Boolean =
         this[key]?.jsonPrimitive?.boolean ?: throw IllegalArgumentException("缺少参数: $key")
 
-    fun JsonObject.booleanOrDefault(key: String, default: Boolean): Boolean =
+    internal fun JsonObject.booleanOrDefault(key: String, default: Boolean): Boolean =
         this[key]?.jsonPrimitive?.booleanOrNull ?: default
 }

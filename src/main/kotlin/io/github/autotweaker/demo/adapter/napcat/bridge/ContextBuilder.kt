@@ -34,7 +34,7 @@ class ContextBuilder(private val napCat: NapCatApi) {
             if (groupId != null) {
                 // 群聊：获取群名并注入群号和群名
                 val groupName = try {
-                    napCat.getGroupList().find { it.groupId == groupId }?.groupName
+                    napCat.getGroupList().find { it.groupId == groupId }?.groupName?.let { escapeXml(it) }
                 } catch (e: Exception) {
                     logger.warn("Failed to get group list for group name: {}", e.message)
                     null
@@ -42,7 +42,7 @@ class ContextBuilder(private val napCat: NapCatApi) {
                 contextBuilder.appendLine("会话类型：群聊")
                 contextBuilder.appendLine("群号：$groupId")
                 if (groupName != null) {
-                    contextBuilder.appendLine("群名：$groupName")
+                    contextBuilder.appendLine("群名：${escapeXml(groupName ?: "未知")}")
                 }
             } else {
                 // 私聊
@@ -54,10 +54,15 @@ class ContextBuilder(private val napCat: NapCatApi) {
             contextBuilder.appendLine("<context>")
 
             // 获取消息历史
-            val messages = if (groupId != null) {
-                napCat.getGroupMsgHistory(groupId, count = 20)
-            } else {
-                napCat.getPrivateMsgHistory(userId, count = 20)
+            val messages = try {
+                if (groupId != null) {
+                    napCat.getGroupMsgHistory(groupId, count = 20)
+                } else {
+                    napCat.getPrivateMsgHistory(userId, count = 20)
+                }
+            } catch (e: Exception) {
+                logger.warn("Failed to load message history", e)
+                emptyList()
             }
 
             // 获取群成员列表用于获取昵称（仅群聊）
@@ -76,16 +81,14 @@ class ContextBuilder(private val napCat: NapCatApi) {
 
             // 构建消息历史
             messages.forEach { msg ->
-                val nickname = if (groupId != null) {
+                val nickname = escapeXml(if (groupId != null) {
                     members.find { it.userId == msg.userId }?.let {
                         it.card.ifEmpty { it.nickname }
                     } ?: msg.sender.nickname.ifEmpty { msg.sender.userId.toString() }
                 } else {
                     msg.sender.nickname.ifEmpty { msg.sender.userId.toString() }
-                }
-                val time = java.time.Instant.ofEpochSecond(msg.time)
-                    .atZone(java.time.ZoneId.systemDefault())
-                    .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"))
+                })
+                val time = formatTime(msg.time)
 
                 // 检测合并转发消息
                 val forwardId = extractForwardId(msg.rawMessage)
@@ -96,10 +99,10 @@ class ContextBuilder(private val napCat: NapCatApi) {
                         contextBuilder.appendLine("[$time] $nickname: [合并转发消息 id=$forwardId]")
                     } catch (e: Exception) {
                         logger.warn("Failed to get forward message {}: {}", forwardId, e.message)
-                        contextBuilder.appendLine("[$time] $nickname: ${msg.rawMessage}")
+                        contextBuilder.appendLine("[$time] $nickname: ${escapeXml(msg.rawMessage)}")
                     }
                 } else {
-                    contextBuilder.appendLine("[$time] $nickname: ${msg.rawMessage}")
+                    contextBuilder.appendLine("[$time] $nickname: ${escapeXml(msg.rawMessage)}")
                 }
             }
 
@@ -110,17 +113,15 @@ class ContextBuilder(private val napCat: NapCatApi) {
                 forwardMessages.forEach { (id, forwardMsgs) ->
                     contextBuilder.appendLine("  <forward id=\"$id\">")
                     forwardMsgs.forEach { msg ->
-                        val nickname = if (groupId != null) {
+                        val nickname = escapeXml(if (groupId != null) {
                             members.find { it.userId == msg.sender.userId }?.let {
                                 it.card.ifEmpty { it.nickname }
                             } ?: msg.sender.nickname.ifEmpty { msg.sender.userId.toString() }
                         } else {
                             msg.sender.nickname.ifEmpty { msg.sender.userId.toString() }
-                        }
-                        val time = java.time.Instant.ofEpochSecond(msg.time)
-                            .atZone(java.time.ZoneId.systemDefault())
-                            .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"))
-                        contextBuilder.appendLine("    [$time] $nickname: ${msg.rawMessage}")
+                        })
+                        val time = formatTime(msg.time)
+                        contextBuilder.appendLine("    [$time] $nickname: ${escapeXml(msg.rawMessage)}")
                     }
                     contextBuilder.appendLine("  </forward>")
                 }
@@ -132,7 +133,7 @@ class ContextBuilder(private val napCat: NapCatApi) {
             contextBuilder.append(text)
 
             val result = contextBuilder.toString()
-            logger.debug("Built message with context for user {} group {}: {}", userId, groupId, result.take(500))
+            logger.debug("Built message with context for user {} group {}, length={}", userId, groupId, result.length)
             result
         } catch (e: Exception) {
             logger.error("Failed to build message context", e)
@@ -156,11 +157,9 @@ class ContextBuilder(private val napCat: NapCatApi) {
                     val forwardText = buildString {
                         appendLine("<forward id=\"$forwardId\">")
                         forwardContent.forEach { msg ->
-                            val nickname = msg.sender.nickname.ifEmpty { msg.sender.userId.toString() }
-                            val time = java.time.Instant.ofEpochSecond(msg.time)
-                                .atZone(java.time.ZoneId.systemDefault())
-                                .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"))
-                            appendLine("  [$time] $nickname: ${msg.rawMessage}")
+                            val nickname = escapeXml(msg.sender.nickname.ifEmpty { msg.sender.userId.toString() })
+                            val time = formatTime(msg.time)
+                            appendLine("  [$time] $nickname: ${escapeXml(msg.rawMessage)}")
                         }
                         append("</forward>")
                     }
@@ -181,7 +180,16 @@ class ContextBuilder(private val napCat: NapCatApi) {
      * @return 合并转发消息 ID，如果不是合并转发消息返回 null
      */
     fun extractForwardId(rawMessage: String): String? {
-        val pattern = "\\[CQ:forward,id=(\\d+)\\]".toRegex()
-        return pattern.find(rawMessage)?.groupValues?.get(1)
+        return FORWARD_PATTERN.find(rawMessage)?.groupValues?.get(1)
+    }
+
+    private fun escapeXml(text: String): String =
+        text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
+
+    private fun formatTime(epochSeconds: Long): String =
+        java.time.Instant.ofEpochSecond(epochSeconds).atZone(java.time.ZoneId.systemDefault()).format(java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm"))
+
+    companion object {
+        private val FORWARD_PATTERN = "\\[CQ:forward,id=(\\d+)\\]".toRegex()
     }
 }
