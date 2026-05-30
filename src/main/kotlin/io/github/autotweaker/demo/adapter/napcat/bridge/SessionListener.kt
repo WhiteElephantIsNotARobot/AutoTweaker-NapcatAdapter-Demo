@@ -50,8 +50,13 @@ class SessionListener(
     /**
      * 确保会话的输出和上下文监听器已启动
      */
-    fun ensureListeners(sessionId: UUID) {
-        val handle = core.session.getHandle(sessionId) ?: return
+    suspend fun ensureListeners(sessionId: UUID) {
+        val handle = try {
+            core.session.getHandle(sessionId)
+        } catch (e: Exception) {
+            logger.warn("Failed to get handle for session {}", sessionId, e)
+            return
+        }
 
         // 启动输出监听
         if (listeningSessions.add(sessionId)) {
@@ -157,7 +162,11 @@ class SessionListener(
                     when (sessionOutput.output.status) {
                         CompactOutput.Status.FINISHED -> {
                             val messageCount = getMessageCount(sessionId)
-                            sendToSession(sessionId, "上下文已压缩，剩余 $messageCount 条消息")
+                            if (messageCount != null) {
+                                sendToSession(sessionId, "上下文已压缩，剩余 $messageCount 条消息")
+                            } else {
+                                sendToSession(sessionId, "上下文已压缩")
+                            }
                         }
                         CompactOutput.Status.FAILED -> {
                             sendToSession(sessionId, "上下文压缩失败")
@@ -242,8 +251,12 @@ class SessionListener(
     /**
      * 获取会话中的消息总数
      */
-    private fun getMessageCount(sessionId: UUID): Int {
-        val handle = core.session.getHandle(sessionId) ?: return 0
+    private suspend fun getMessageCount(sessionId: UUID): Int? {
+        val handle = try {
+            core.session.getHandle(sessionId)
+        } catch (e: Exception) {
+            return null
+        }
         val context = handle.context.value
         return getMessageCountFromIndex(context.index)
     }

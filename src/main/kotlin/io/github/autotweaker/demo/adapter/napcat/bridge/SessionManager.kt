@@ -3,6 +3,7 @@ package io.github.autotweaker.demo.adapter.napcat.bridge
 import io.github.autotweaker.api.adapter.CoreAPI
 import io.github.autotweaker.api.types.session.SessionConfig
 import io.github.autotweaker.api.types.session.SessionHandle
+import io.github.autotweaker.demo.adapter.napcat.command.commands.WorkspaceCommand
 import io.github.autotweaker.demo.adapter.napcat.permission.PermissionManager
 import org.slf4j.LoggerFactory
 import java.util.UUID
@@ -77,9 +78,14 @@ class SessionManager(
         persistence.save()
     }
 
-    fun getActiveSessionHandle(userId: Long): SessionHandle? {
+    suspend fun getActiveSessionHandle(userId: Long): SessionHandle? {
         val sessionId = activeSessions[userId] ?: return null
-        return core.session.getHandle(sessionId)
+        return try {
+            core.session.getHandle(sessionId)
+        } catch (e: Exception) {
+            logger.warn("Failed to get handle for session {}", sessionId, e)
+            null
+        }
     }
 
     /**
@@ -213,7 +219,7 @@ class SessionManager(
         // 获取用户选择的工作区
         val selectedWorkspaceId = userSelectedWorkspaces[userId]
 
-        val handle = if (permissionManager.hasNonContainerPermission(userId)) {
+        val sessionId = if (permissionManager.hasNonContainerPermission(userId)) {
             // 有非容器权限：优先使用用户选择的工作区，否则用默认工作区
             if (selectedWorkspaceId != null) {
                 val workspace = core.session.listWorkspaces()
@@ -229,12 +235,10 @@ class SessionManager(
         } else {
             // 无非容器权限：只能用容器内工作区
             val containerWorkspaces = core.session.listWorkspaces()
-                .filter { it.meta.inContainer }
+                .filter { WorkspaceCommand.isContainerWorkspace(it.meta.path) }
             if (containerWorkspaces.isEmpty()) {
                 throw IllegalStateException("没有可用的容器工作区，请联系操作员创建")
             }
-
-            // 优先使用用户选择的工作区
             val workspace = if (selectedWorkspaceId != null) {
                 containerWorkspaces.find { it.meta.id == selectedWorkspaceId }
                     ?: containerWorkspaces.first()
@@ -244,14 +248,15 @@ class SessionManager(
             core.session.create(workspace.meta.id, config)
         }
 
-        core.session.updateTitle(handle.id, title)
-        setActiveSession(userId, handle.id)
-        logger.info("Auto-created session {} for user {}", handle.id, userId)
+        val handle = core.session.getHandle(sessionId)
+        core.session.updateTitle(sessionId, title)
+        setActiveSession(userId, sessionId)
+        logger.info("Auto-created session {} for user {}", sessionId, userId)
         return handle
     }
 
-    fun enterSession(userId: Long, sessionId: UUID): SessionHandle? {
-        val handle = core.session.getHandle(sessionId) ?: return null
+    suspend fun enterSession(userId: Long, sessionId: UUID): SessionHandle {
+        val handle = core.session.getHandle(sessionId)
         setActiveSession(userId, sessionId)
         return handle
     }

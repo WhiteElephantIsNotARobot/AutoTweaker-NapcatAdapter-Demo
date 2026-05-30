@@ -28,9 +28,11 @@ class EnterCommand : Command {
             return "无效的会话 ID: ${context.args[0]}"
         }
 
-        val handle = context.sessionManager.enterSession(context.userId, sessionId)
-            ?: return "会话不存在: $sessionId"
-
-        return "已进入会话: $sessionId"
+        return try {
+            context.sessionManager.enterSession(context.userId, sessionId)
+            "已进入会话: $sessionId"
+        } catch (_: Exception) {
+            "会话不存在: $sessionId"
+        }
     }
 }

@@ -7,24 +7,24 @@
 ```kotlin
 interface SessionAPI {
     // 会话生命周期
-    suspend fun create(config: SessionConfig): SessionHandle
-    suspend fun create(workspaceId: UUID, config: SessionConfig): SessionHandle
+    suspend fun create(config: SessionConfig): UUID
+    suspend fun create(workspaceId: UUID, config: SessionConfig): UUID
     suspend fun delete(sessionId: UUID)
-    fun getHandle(sessionId: UUID): SessionHandle?
-    fun updateTitle(sessionId: UUID, title: String)
-    fun updateConfig(sessionId: UUID, config: SessionConfig)
+    suspend fun getHandle(sessionId: UUID): SessionHandle
+    suspend fun updateTitle(sessionId: UUID, title: String)
+    suspend fun updateConfig(sessionId: UUID, config: SessionConfig)
 
     // 会话控制
     suspend fun stop(sessionId: UUID)
-    fun pause(sessionId: UUID)
-    fun resume(sessionId: UUID)
-    fun cancel(sessionId: UUID)
-    fun retry(sessionId: UUID)
-    fun compact(sessionId: UUID)
+    suspend fun pause(sessionId: UUID)
+    suspend fun resume(sessionId: UUID)
+    suspend fun cancel(sessionId: UUID)
+    suspend fun retry(sessionId: UUID)
+    suspend fun compact(sessionId: UUID)
 
     // 消息交互
     suspend fun send(sessionId: UUID, content: String, images: List<Base64>? = null)
-    fun approveToolCall(sessionId: UUID, approvals: List<ToolApprove>)
+    suspend fun approveToolCall(sessionId: UUID, approvals: List<ToolApprove>)
 
     // 数据加载
     suspend fun loadData(ids: List<UUID>): List<SessionData>?
@@ -34,9 +34,11 @@ interface SessionAPI {
 
     // 工作区管理
     fun createWorkspace(meta: WorkspaceMeta): WorkspaceData
-    suspend fun renameWorkspace(id: UUID, newName: String)
+    fun renameWorkspace(id: UUID, newName: String)
     suspend fun deleteWorkspace(id: UUID)
     fun listWorkspaces(): List<WorkspaceData>
+
+    fun isContainerRunning(): Boolean
 }
 ```
 
@@ -45,8 +47,8 @@ interface SessionAPI {
 ### create
 
 ```kotlin
-suspend fun create(config: SessionConfig): SessionHandle
-suspend fun create(workspaceId: UUID, config: SessionConfig): SessionHandle
+suspend fun create(config: SessionConfig): UUID
+suspend fun create(workspaceId: UUID, config: SessionConfig): UUID
 ```
 
 创建新会话。
@@ -58,22 +60,23 @@ suspend fun create(workspaceId: UUID, config: SessionConfig): SessionHandle
 | `config` | `SessionConfig` | 会话配置 |
 | `workspaceId` | `UUID` | 工作区 ID（可选，默认使用默认工作区） |
 
-**返回值：** `SessionHandle` 会话句柄
+**返回值：** `UUID` 会话 ID
 
 **异常：**
 
 | 异常 | 条件 |
 |------|------|
 | `IllegalStateException("Workspace not found: ...")` | 工作区 ID 不存在 |
-| `error("Unknown model: ...")` | 模型 ID 不存在 |
-| `require("Duplicate CoreTool: ...")` | 存在重复的 CoreTool 名称 |
-| `check("SecretManager is locked.")` | 密钥管理器未解锁 |
+| `IllegalStateException("Unknown model: ...")` | 模型 ID 不存在 |
+| `IllegalArgumentException("Duplicate CoreTool: ...")` | 存在重复的 CoreTool 名称 |
+| `IllegalStateException("SecretManager is locked.")` | 密钥管理器未解锁 |
 
 **副作用：**
 
-- 若工作区 `inContainer=true`，自动启动 Docker 容器
+- 若工作区为容器工作区（路径推断），自动启动 Docker 容器
 - 会话数据持久化到数据库
 - 工作区更新会话 ID 列表
+- 会话立即进入内存，后续 `getHandle()` 可直接获取
 
 ### delete
 
@@ -98,25 +101,34 @@ suspend fun delete(sessionId: UUID)
 ### getHandle
 
 ```kotlin
-fun getHandle(sessionId: UUID): SessionHandle?
+suspend fun getHandle(sessionId: UUID): SessionHandle
 ```
 
-获取会话句柄。
+获取会话句柄。若会话不在内存中，自动从数据库恢复（sessionOrRestore）。
 
-**返回值：** `SessionHandle?` 会话句柄，不存在返回 `null`
+**返回值：** `SessionHandle` 会话句柄
+
+**异常：**
+
+| 异常 | 条件 |
+|------|------|
+| `IllegalStateException("<id> not found")` | 会话 ID 在数据库中不存在 |
+| `IllegalStateException("Workspace not found: ...")` | 会话关联的工作区不存在 |
+
+**说明：** `create()` 后立即调用 `getHandle()` 不会抛异常，因为会话已进入内存。异常仅发生在引用不存在或已损坏的会话时。
 
 ### updateTitle
 
 ```kotlin
-fun updateTitle(sessionId: UUID, title: String)
+suspend fun updateTitle(sessionId: UUID, title: String)
 ```
 
-更新会话标题。
+更新会话标题。内部通过 `sessionOrRestore` 获取会话。
 
 ### updateConfig
 
 ```kotlin
-fun updateConfig(sessionId: UUID, config: SessionConfig)
+suspend fun updateConfig(sessionId: UUID, config: SessionConfig)
 ```
 
 更新会话配置（模型、thinking 等）。
@@ -127,6 +139,8 @@ fun updateConfig(sessionId: UUID, config: SessionConfig)
 - 若会话正在处理中，模型更新会在当前任务完成后生效
 
 ## 会话控制
+
+所有会话控制方法均为 `suspend`，内部通过 `sessionOrRestore` 获取会话，异常行为同 `getHandle`。
 
 ### stop
 
@@ -145,8 +159,8 @@ suspend fun stop(sessionId: UUID)
 ### pause / resume
 
 ```kotlin
-fun pause(sessionId: UUID)
-fun resume(sessionId: UUID)
+suspend fun pause(sessionId: UUID)
+suspend fun resume(sessionId: UUID)
 ```
 
 暂停/恢复会话。
@@ -159,20 +173,15 @@ fun resume(sessionId: UUID)
 ### cancel
 
 ```kotlin
-fun cancel(sessionId: UUID)
+suspend fun cancel(sessionId: UUID)
 ```
 
 取消当前工具调用或上下文压缩。
 
-**副作用：**
-
-- 取消当前工具执行任务
-- 取消正在进行的 compact 任务
-
 ### retry
 
 ```kotlin
-fun retry(sessionId: UUID)
+suspend fun retry(sessionId: UUID)
 ```
 
 重试上一次请求（仅在 `ERROR` 状态有效）。
@@ -180,7 +189,7 @@ fun retry(sessionId: UUID)
 ### compact
 
 ```kotlin
-fun compact(sessionId: UUID)
+suspend fun compact(sessionId: UUID)
 ```
 
 手动触发上下文压缩。
@@ -218,7 +227,7 @@ suspend fun send(sessionId: UUID, content: String, images: List<Base64>? = null)
 ### approveToolCall
 
 ```kotlin
-fun approveToolCall(sessionId: UUID, approvals: List<ToolApprove>)
+suspend fun approveToolCall(sessionId: UUID, approvals: List<ToolApprove>)
 ```
 
 审批工具调用请求。
@@ -254,32 +263,40 @@ fun getUsageSnapshots(): List<UsageSnapshot>
 
 ## 工作区管理
 
+### isContainerRunning
+
+```kotlin
+fun isContainerRunning(): Boolean
+```
+
+检查容器是否正在运行。容器按需启动，此方法返回当前状态。
+
 ### createWorkspace
 
 ```kotlin
 fun createWorkspace(meta: WorkspaceMeta): WorkspaceData
 ```
 
-创建工作区。
+创建工作区。容器状态从工作区路径推断。
 
 **参数：**
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
-| `meta` | `WorkspaceMeta` | 工作区元数据 |
+| `meta` | `WorkspaceMeta` | 工作区元数据（displayName, path） |
 
 **异常：**
 
 | 异常 | 条件 |
 |------|------|
 | `IllegalStateException("... is not a directory")` | 路径不是目录 |
-| `error("Workspace with name ... already exists")` | 工作区显示名称重复 |
-| `error("already exists id=...")` | 工作区 ID 重复 |
+| `IllegalStateException("Workspace with name ... already exists")` | 工作区显示名称重复 |
+| `IllegalStateException("already exists id=...")` | 工作区 ID 重复 |
 
 ### renameWorkspace
 
 ```kotlin
-suspend fun renameWorkspace(id: UUID, newName: String)
+fun renameWorkspace(id: UUID, newName: String)
 ```
 
 重命名工作区。
@@ -288,11 +305,7 @@ suspend fun renameWorkspace(id: UUID, newName: String)
 
 | 异常 | 条件 |
 |------|------|
-| `error("Workspace not found: ...")` | 工作区 ID 不存在 |
-
-**副作用：**
-
-- 更新所有关联会话的工作区名称
+| `IllegalStateException("Workspace not found: ...")` | 工作区 ID 不存在 |
 
 ### deleteWorkspace
 
@@ -306,8 +319,8 @@ suspend fun deleteWorkspace(id: UUID)
 
 | 异常 | 条件 |
 |------|------|
-| `error("Workspace not found: ...")` | 工作区 ID 不存在 |
-| `error("Cannot delete default workspace")` | 不能删除默认工作区 |
+| `IllegalStateException("Workspace not found: ...")` | 工作区 ID 不存在 |
+| `IllegalStateException("Cannot delete default workspace")` | 不能删除默认工作区 |
 
 **副作用：**
 
@@ -321,41 +334,3 @@ fun listWorkspaces(): List<WorkspaceData>
 ```
 
 列出所有工作区。
-
-## 示例
-
-```kotlin
-// 创建会话
-val handle = core.session.create(SessionConfig(
-    model = modelId,
-    fallbackModel = listOf(fallbackId),
-    summarizeModel = summarizeId,
-    thinking = true
-))
-
-// 监听输出
-scope.launch {
-    handle.output.collect { output ->
-        when (output) {
-            is SessionOutput.LlmDelta -> print(output.delta.content)
-            is SessionOutput.ToolRequest -> {
-                // 审批工具调用
-                core.session.approveToolCall(handle.id, output.requests.map {
-                    ToolApprove(it.name, approved = true)
-                })
-            }
-            else -> {}
-        }
-    }
-}
-
-// 发送消息
-core.session.send(handle.id, "帮我读取文件")
-
-// 暂停/恢复
-core.session.pause(handle.id)
-core.session.resume(handle.id)
-
-// 删除会话
-core.session.delete(handle.id)
-```
