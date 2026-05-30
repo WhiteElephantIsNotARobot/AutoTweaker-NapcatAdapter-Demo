@@ -29,6 +29,7 @@ class OperatorCommand : Command {
                 if (context.args.size < 2) return "用法: /op add <userId>"
                 val userId = context.args[1].toLongOrNull()
                     ?: return "无效的 QQ 号: ${context.args[1]}"
+                if (userId <= 0) return "无效的 QQ 号"
                 if (context.permissionManager.addOperator(userId)) {
                     "已添加操作员: $userId"
                 } else {
@@ -39,6 +40,8 @@ class OperatorCommand : Command {
                 if (context.args.size < 2) return "用法: /op remove <userId>"
                 val userId = context.args[1].toLongOrNull()
                     ?: return "无效的 QQ 号: ${context.args[1]}"
+                if (userId <= 0) return "无效的 QQ 号"
+                if (context.permissionManager.getRole(userId) == Role.ADMIN) return "不能移除管理员自身的权限"
                 if (context.permissionManager.removeOperator(userId)) {
                     "已移除操作员: $userId"
                 } else {

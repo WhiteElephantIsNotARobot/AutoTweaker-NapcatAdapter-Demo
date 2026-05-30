@@ -48,7 +48,7 @@ data class HeartbeatMetaEvent(
  *
  * @property time 事件时间戳
  * @property selfId 机器人 QQ 号
- * @property subType 子类型（connect/enable/disable）
+ * @property subType 子类型。已知值: connect, enable, disable
  */
 @Serializable
 data class LifecycleMetaEvent(

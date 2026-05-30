@@ -5,6 +5,7 @@ import io.github.autotweaker.api.types.session.SessionConfig
 import io.github.autotweaker.api.types.session.SessionHandle
 import io.github.autotweaker.demo.adapter.napcat.command.commands.WorkspaceCommand
 import io.github.autotweaker.demo.adapter.napcat.permission.PermissionManager
+import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -49,6 +50,10 @@ class SessionManager(
     @Volatile
     private var globalSummarizeModel: UUID? = null
 
+    private var persistenceDirty = false
+    private var persistenceJob: Job? = null
+    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+
     private val persistence = SessionPersistence(
         store = core.config.jsonStore(SessionManager::class),
         activeSessions = activeSessions,
@@ -70,12 +75,12 @@ class SessionManager(
 
     fun setActiveSession(userId: Long, sessionId: UUID) {
         activeSessions[userId] = sessionId
-        persistence.save()
+        scheduleSave()
     }
 
     fun clearActiveSession(userId: Long) {
         activeSessions.remove(userId)
-        persistence.save()
+        scheduleSave()
     }
 
     suspend fun getActiveSessionHandle(userId: Long): SessionHandle? {
@@ -113,7 +118,7 @@ class SessionManager(
      */
     fun setUserPrimaryModel(userId: Long, modelId: UUID) {
         userPrimaryModels[userId] = modelId
-        persistence.save()
+        scheduleSave()
         logger.info("User {} primary model set to {}", userId, modelId)
     }
 
@@ -135,7 +140,7 @@ class SessionManager(
      */
     fun setUserWorkspace(userId: Long, workspaceId: UUID) {
         userSelectedWorkspaces[userId] = workspaceId
-        persistence.save()
+        scheduleSave()
         logger.info("User {} selected workspace {}", userId, workspaceId)
     }
 
@@ -157,7 +162,7 @@ class SessionManager(
      */
     fun setUserThinking(userId: Long, enabled: Boolean) {
         userThinking[userId] = enabled
-        persistence.save()
+        scheduleSave()
         logger.info("User {} thinking set to {}", userId, enabled)
     }
 
@@ -180,9 +185,11 @@ class SessionManager(
      * @return true 如果添加成功，false 如果已存在
      */
     fun addFallbackModel(modelId: UUID): Boolean {
-        if (modelId in globalFallbackModels) return false
-        globalFallbackModels.add(modelId)
-        persistence.save()
+        synchronized(globalFallbackModels) {
+            if (modelId in globalFallbackModels) return false
+            globalFallbackModels.add(modelId)
+        }
+        scheduleSave()
         logger.info("Added fallback model: {}", modelId)
         return true
     }
@@ -195,7 +202,7 @@ class SessionManager(
      */
     fun removeFallbackModel(modelId: UUID): Boolean {
         if (!globalFallbackModels.remove(modelId)) return false
-        persistence.save()
+        scheduleSave()
         logger.info("Removed fallback model: {}", modelId)
         return true
     }
@@ -207,7 +214,7 @@ class SessionManager(
      */
     fun setSummarizeModel(modelId: UUID) {
         globalSummarizeModel = modelId
-        persistence.save()
+        scheduleSave()
         logger.info("Summarize model set to {}", modelId)
     }
 
@@ -225,7 +232,12 @@ class SessionManager(
                 val workspace = core.session.listWorkspaces()
                     .find { it.meta.id == selectedWorkspaceId }
                 if (workspace != null) {
-                    core.session.create(workspace.meta.id, config)
+                    try {
+                        core.session.create(workspace.meta.id, config)
+                    } catch (e: Exception) {
+                        logger.warn("Failed to create session with workspace {}, falling back to default", selectedWorkspaceId, e)
+                        core.session.create(config)
+                    }
                 } else {
                     core.session.create(config)
                 }
@@ -265,6 +277,21 @@ class SessionManager(
         if (activeSessions[userId] == null) return false
         clearActiveSession(userId)
         return true
+    }
+
+    // ==================== 防抖持久化 ====================
+
+    private fun scheduleSave() {
+        persistenceDirty = true
+        if (persistenceJob?.isActive != true) {
+            persistenceJob = scope.launch {
+                delay(500)
+                if (persistenceDirty) {
+                    persistenceDirty = false
+                    persistence.save()
+                }
+            }
+        }
     }
 
     // ==================== 内部实现 ====================

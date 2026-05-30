@@ -116,7 +116,7 @@ data class GroupRecallNoticeEvent(
  * @property noticeType 通知类型
  * @property groupId 群号
  * @property userId 被操作的成员 QQ 号
- * @property subType 子类型（set/unset）
+ * @property subType 子类型。已知值: set, unset
  */
 @Serializable
 data class GroupAdminNoticeEvent(
@@ -147,7 +147,7 @@ data class GroupUploadNoticeEvent(
     @SerialName("notice_type") override val noticeType: NoticeType,
     @SerialName("group_id") val groupId: Long,
     @SerialName("user_id") val userId: Long,
-    val file: FileInfo
+    val file: UploadFileInfo
 ) : NoticeEvent() {
     /**
      * 上传文件信息
@@ -158,7 +158,7 @@ data class GroupUploadNoticeEvent(
      * @property url 文件下载 URL
      */
     @Serializable
-    data class FileInfo(
+    data class UploadFileInfo(
         val id: String,
         val name: String,
         val size: Long,

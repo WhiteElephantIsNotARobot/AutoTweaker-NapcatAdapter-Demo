@@ -32,14 +32,16 @@ import org.slf4j.LoggerFactory
 class NapCatAdapter : Adapter {
 
     companion object {
-        private var _core: CoreAPI? = null
-        private var _napCatApi: NapCatApi? = null
+        @Volatile private var _core: CoreAPI? = null
+        @Volatile private var _napCatApi: NapCatApi? = null
+        @Volatile var initializationState: String = "NOT_STARTED"
+            private set
 
         /** CoreAPI 实例，适配器启动后可用 */
-        val core: CoreAPI get() = _core ?: throw IllegalStateException("NapCatAdapter not started")
+        val core: CoreAPI get() = _core ?: throw IllegalStateException("CoreAPI not initialized (state=$initializationState)")
 
         /** NapCat API 实例，WebSocket 连接后可用 */
-        val napCatApi: NapCatApi get() = _napCatApi ?: throw IllegalStateException("NapCatAdapter not started")
+        val napCatApi: NapCatApi get() = _napCatApi ?: throw IllegalStateException("NapCatAPI not initialized (state=$initializationState)")
     }
 
     private val logger = LoggerFactory.getLogger(NapCatAdapter::class.java)
@@ -58,6 +60,7 @@ class NapCatAdapter : Adapter {
     }
 
     override fun start(core: CoreAPI) {
+        initializationState = "STARTING"
         _core = core
         logger.info("NapCat adapter starting...")
 
@@ -74,14 +77,18 @@ class NapCatAdapter : Adapter {
         }
 
         // 已解锁，直接初始化
+        initializationState = "INITIALIZING"
         initializeComponentsBlocking(core)
+        initializationState = "READY"
     }
 
     private suspend fun waitForUnlockAndInitialize(core: CoreAPI) {
         try {
             core.secret.isUnlocked.first { it }
             logger.info("Secret unlocked, initializing components...")
+            initializationState = "INITIALIZING"
             initializeComponents(core)
+            initializationState = "READY"
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -89,6 +96,7 @@ class NapCatAdapter : Adapter {
         }
     }
 
+    /** 同步初始化组件，会阻塞当前线程。仅在密钥库已解锁时调用。 */
     private fun initializeComponentsBlocking(core: CoreAPI) {
         runBlocking {
             initializeComponents(core)
@@ -126,12 +134,8 @@ class NapCatAdapter : Adapter {
         // 初始化 WebSocket 客户端
         val client = NapCatWsClientImpl()
 
-        // 提前暴露 API 实例，供 Tool 使用
-        _napCatApi = client
-        logger.info("_napCatApi set, classloader={}", NapCatAdapter::class.java.classLoader)
-
         // 初始化消息桥接，传入适配器级协程作用域
-        val scope = adapterScope!!
+        val scope = adapterScope ?: throw IllegalStateException("adapterScope not initialized")
         val bridge = MessageBridge(core, client, sessionManager, commandRegistry, permissionManager, scope)
 
         // 注册事件处理器
@@ -154,8 +158,11 @@ class NapCatAdapter : Adapter {
         // 连接
         try {
             client.connect(host, port, token)
+            _napCatApi = client
+            logger.debug("_napCatApi set, classloader={}", NapCatAdapter::class.java.classLoader)
             logger.info("NapCat adapter started, connecting to {}:{}", host, port)
         } catch (e: Exception) {
+            _napCatApi = null
             logger.error("Failed to connect to NapCat", e)
         }
 
@@ -164,6 +171,7 @@ class NapCatAdapter : Adapter {
     }
 
     override fun stop() {
+        initializationState = "STOPPED"
         logger.info("Stopping NapCat adapter...")
         // 取消所有协程（包括输出监听器）
         adapterScope?.cancel()

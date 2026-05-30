@@ -3,6 +3,7 @@ package io.github.autotweaker.demo.adapter.napcat.command.commands
 import io.github.autotweaker.demo.adapter.napcat.command.Command
 import io.github.autotweaker.demo.adapter.napcat.command.CommandContext
 import io.github.autotweaker.demo.adapter.napcat.permission.Role
+import org.slf4j.LoggerFactory
 
 /**
  * Thinking 开关命令
@@ -16,6 +17,8 @@ import io.github.autotweaker.demo.adapter.napcat.permission.Role
  * 若当前有活跃会话，会同时更新会话配置使其即时生效。
  */
 class ThinkingCommand : Command {
+
+    private val logger = LoggerFactory.getLogger(ThinkingCommand::class.java)
 
     override val name = "thinking"
     override val description = "开关思考模式"
@@ -49,8 +52,8 @@ class ThinkingCommand : Command {
             val config = handle.data.value.config
             try {
                 context.core.session.updateConfig(handle.id, config.copy(thinking = enabled))
-            } catch (_: Exception) {
-                // 会话可能已失效，不影响用户偏好已保存的事实
+            } catch (e: Exception) {
+                logger.debug("Failed to update thinking config", e)
             }
             return "思考模式已$state，当前会话已生效"
         }

@@ -32,7 +32,7 @@ class PermissionManager(private val core: CoreAPI) {
     }
 
     @Volatile
-    private var cachedAdminQQ: Long = -1L
+    private var cachedAdminQQ: Long? = null
 
     private val cachedOperators = CopyOnWriteArrayList<Long>()
     private val cachedUsers = CopyOnWriteArrayList<Long>()
@@ -67,8 +67,10 @@ class PermissionManager(private val core: CoreAPI) {
 
     fun addOperator(userId: Long): Boolean {
         ensureOperatorsLoaded()
-        if (userId in cachedOperators) return false
-        cachedOperators.add(userId)
+        synchronized(cachedOperators) {
+            if (userId in cachedOperators) return false
+            cachedOperators.add(userId)
+        }
         saveOperators()
         logger.info("Added operator: {}", userId)
         return true
@@ -91,8 +93,10 @@ class PermissionManager(private val core: CoreAPI) {
 
     fun addUser(userId: Long): Boolean {
         ensureUsersLoaded()
-        if (userId in cachedUsers) return false
-        cachedUsers.add(userId)
+        synchronized(cachedUsers) {
+            if (userId in cachedUsers) return false
+            cachedUsers.add(userId)
+        }
         saveUsers()
         logger.info("Added user: {}", userId)
         return true
@@ -124,7 +128,7 @@ class PermissionManager(private val core: CoreAPI) {
     fun hasNonContainerPermission(userId: Long): Boolean {
         val role = getRole(userId)
         if (role == null) return false
-        if (role.ordinal <= Role.OPERATOR.ordinal) return true
+        if (role.level >= Role.OPERATOR.level) return true
         return userId in userNonContainerPermissions
     }
 
@@ -167,10 +171,15 @@ class PermissionManager(private val core: CoreAPI) {
     // ==================== 内部实现 ====================
 
     private fun getAdminQQ(): Long {
-        if (cachedAdminQQ == -1L) {
-            cachedAdminQQ = core.config.settingService.get(NapCatSettings.AdminQQ()).value
+        val cached = cachedAdminQQ
+        if (cached != null) return cached
+        synchronized(this) {
+            val cached2 = cachedAdminQQ
+            if (cached2 != null) return cached2
+            val value = core.config.settingService.get(NapCatSettings.AdminQQ()).value
+            cachedAdminQQ = value
+            return value
         }
-        return cachedAdminQQ
     }
 
     private fun isOperator(userId: Long): Boolean {
@@ -218,6 +227,7 @@ class PermissionManager(private val core: CoreAPI) {
     private fun saveNonContainerPermissions() = saveList("non_container", userNonContainerPermissions.toList())
 
     private fun saveList(key: String, list: List<Long>) {
+      synchronized(this) {
         try {
             // 读取现有数据，合并后写回
             val existing = try {
@@ -240,5 +250,6 @@ class PermissionManager(private val core: CoreAPI) {
         } catch (e: Exception) {
             logger.error("Failed to save list: {}", key, e)
         }
+      }
     }
 }

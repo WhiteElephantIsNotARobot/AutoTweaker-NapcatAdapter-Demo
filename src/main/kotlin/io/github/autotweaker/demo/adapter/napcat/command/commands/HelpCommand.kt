@@ -27,7 +27,7 @@ class HelpCommand(private val registry: CommandRegistry) : Command {
             if (cmd == null) {
                 return "未知命令: $commandName"
             }
-            if (role.ordinal > cmd.requiredRole.ordinal) {
+            if (role.level < cmd.requiredRole.level) {
                 return "权限不足，需要 ${cmd.requiredRole.name} 角色"
             }
             return buildString {
@@ -39,7 +39,7 @@ class HelpCommand(private val registry: CommandRegistry) : Command {
 
         // 否则显示所有命令列表
         val commands = registry.listCommands()
-            .filter { role.ordinal <= it.requiredRole.ordinal }
+            .filter { role.level >= it.requiredRole.level }
             .sortedBy { it.name }
 
         return buildString {

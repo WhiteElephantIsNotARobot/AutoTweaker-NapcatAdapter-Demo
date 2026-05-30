@@ -73,7 +73,7 @@ abstract class NapCatApiImpl(
 
     override suspend fun sendPrivateMessage(userId: Long, message: MessageChain): MessageResult {
         val params = buildMap {
-            put("user_id", json.encodeToJsonElement(userId.toString()))
+            put("user_id", JsonPrimitive(userId))
             put("message", json.encodeToJsonElement(message))
         }
         return callApiAndDecode("send_private_msg", params, MessageResult.serializer())
@@ -81,7 +81,7 @@ abstract class NapCatApiImpl(
 
     override suspend fun sendGroupMessage(groupId: Long, message: MessageChain): MessageResult {
         val params = buildMap {
-            put("group_id", json.encodeToJsonElement(groupId.toString()))
+            put("group_id", JsonPrimitive(groupId))
             put("message", json.encodeToJsonElement(message))
         }
         return callApiAndDecode("send_group_msg", params, MessageResult.serializer())
@@ -113,23 +113,23 @@ abstract class NapCatApiImpl(
 
     override suspend fun getGroupMemberList(groupId: Long): List<GroupMemberInfo> {
         val params = buildMap {
-            put("group_id", json.encodeToJsonElement(groupId.toString()))
+            put("group_id", JsonPrimitive(groupId))
         }
         return callApiAndDecode("get_group_member_list", params, serializer<List<GroupMemberInfo>>())
     }
 
     override suspend fun getGroupMemberInfo(groupId: Long, userId: Long): GroupMemberInfo {
         val params = buildMap {
-            put("group_id", json.encodeToJsonElement(groupId.toString()))
-            put("user_id", json.encodeToJsonElement(userId.toString()))
+            put("group_id", JsonPrimitive(groupId))
+            put("user_id", JsonPrimitive(userId))
         }
         return callApiAndDecode("get_group_member_info", params, GroupMemberInfo.serializer())
     }
 
     override suspend fun setGroupKick(groupId: Long, userId: Long, rejectAddRequest: Boolean) {
         val params = buildMap {
-            put("group_id", json.encodeToJsonElement(groupId.toString()))
-            put("user_id", json.encodeToJsonElement(userId.toString()))
+            put("group_id", JsonPrimitive(groupId))
+            put("user_id", JsonPrimitive(userId))
             put("reject_add_request", json.encodeToJsonElement(rejectAddRequest))
         }
         callApiAndDecode("set_group_kick", params, JsonObject.serializer())
@@ -137,8 +137,8 @@ abstract class NapCatApiImpl(
 
     override suspend fun setGroupBan(groupId: Long, userId: Long, duration: Int) {
         val params = buildMap {
-            put("group_id", json.encodeToJsonElement(groupId.toString()))
-            put("user_id", json.encodeToJsonElement(userId.toString()))
+            put("group_id", JsonPrimitive(groupId))
+            put("user_id", JsonPrimitive(userId))
             put("duration", json.encodeToJsonElement(duration))
         }
         callApiAndDecode("set_group_ban", params, JsonObject.serializer())
@@ -146,8 +146,8 @@ abstract class NapCatApiImpl(
 
     override suspend fun setGroupCard(groupId: Long, userId: Long, card: String) {
         val params = buildMap {
-            put("group_id", json.encodeToJsonElement(groupId.toString()))
-            put("user_id", json.encodeToJsonElement(userId.toString()))
+            put("group_id", JsonPrimitive(groupId))
+            put("user_id", JsonPrimitive(userId))
             put("card", json.encodeToJsonElement(card))
         }
         callApiAndDecode("set_group_card", params, JsonObject.serializer())
@@ -155,7 +155,7 @@ abstract class NapCatApiImpl(
 
     override suspend fun setGroupName(groupId: Long, groupName: String) {
         val params = buildMap {
-            put("group_id", json.encodeToJsonElement(groupId.toString()))
+            put("group_id", JsonPrimitive(groupId))
             put("group_name", json.encodeToJsonElement(groupName))
         }
         callApiAndDecode("set_group_name", params, JsonObject.serializer())
@@ -163,8 +163,8 @@ abstract class NapCatApiImpl(
 
     override suspend fun setGroupAdmin(groupId: Long, userId: Long, enable: Boolean) {
         val params = buildMap {
-            put("group_id", json.encodeToJsonElement(groupId.toString()))
-            put("user_id", json.encodeToJsonElement(userId.toString()))
+            put("group_id", JsonPrimitive(groupId))
+            put("user_id", JsonPrimitive(userId))
             put("enable", json.encodeToJsonElement(enable))
         }
         callApiAndDecode("set_group_admin", params, JsonObject.serializer())
@@ -172,13 +172,19 @@ abstract class NapCatApiImpl(
 
     override suspend fun getGroupMsgHistory(groupId: Long, messageSeq: Long?, count: Int): List<GroupMessageEvent> {
         val params = buildMap {
-            put("group_id", json.encodeToJsonElement(groupId.toString()))
+            put("group_id", JsonPrimitive(groupId))
             if (messageSeq != null) {
                 put("message_seq", json.encodeToJsonElement(messageSeq))
             }
             put("count", json.encodeToJsonElement(count))
         }
         val response = callApi("get_group_msg_history", params)
+        val status = response["status"]?.jsonPrimitive?.content
+        if (status != "ok") {
+            val retcode = response["retcode"]?.jsonPrimitive?.int ?: -1
+            val msg = response["message"]?.jsonPrimitive?.content ?: "Unknown error"
+            throw NapCatApiException(retcode, msg)
+        }
         val data = response["data"]?.jsonObject ?: return emptyList()
         val messages = data["messages"]?.jsonArray ?: return emptyList()
         return messages.mapNotNull { element ->
@@ -199,13 +205,19 @@ abstract class NapCatApiImpl(
 
     override suspend fun getPrivateMsgHistory(userId: Long, messageSeq: Long?, count: Int): List<PrivateMessageEvent> {
         val params = buildMap {
-            put("user_id", json.encodeToJsonElement(userId.toString()))
+            put("user_id", JsonPrimitive(userId))
             if (messageSeq != null) {
                 put("message_seq", json.encodeToJsonElement(messageSeq))
             }
             put("count", json.encodeToJsonElement(count))
         }
         val response = callApi("get_friend_msg_history", params)
+        val status = response["status"]?.jsonPrimitive?.content
+        if (status != "ok") {
+            val retcode = response["retcode"]?.jsonPrimitive?.int ?: -1
+            val msg = response["message"]?.jsonPrimitive?.content ?: "Unknown error"
+            throw NapCatApiException(retcode, msg)
+        }
         val data = response["data"]?.jsonObject ?: return emptyList()
         val messages = data["messages"]?.jsonArray ?: return emptyList()
         return messages.mapNotNull { element ->

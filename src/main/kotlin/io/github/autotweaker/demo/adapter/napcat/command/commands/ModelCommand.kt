@@ -86,12 +86,14 @@ class ModelCommand : Command {
         }
     }
 
+    private fun requireOperator(context: CommandContext): String? {
+        val role = context.permissionManager.getRole(context.userId)
+        return if (role == null || role.level < Role.OPERATOR.level) "需要操作员权限" else null
+    }
+
     private suspend fun createModel(context: CommandContext): String {
         // 创建模型需要操作员权限
-        val role = context.role
-        if (role == null || role.ordinal > Role.OPERATOR.ordinal) {
-            return "权限不足，需要操作员角色"
-        }
+        requireOperator(context)?.let { return it }
 
         if (context.args.size < 4) {
             return "用法: /model create <提供商名称> <模型ID> <显示名称>"
@@ -155,10 +157,7 @@ class ModelCommand : Command {
 
     private suspend fun deleteModel(context: CommandContext): String {
         // 删除模型需要操作员权限
-        val role = context.role
-        if (role == null || role.ordinal > Role.OPERATOR.ordinal) {
-            return "权限不足，需要操作员角色"
-        }
+        requireOperator(context)?.let { return it }
 
         if (context.args.size < 2) {
             return "用法: /model delete <显示名称|序号>"
@@ -212,10 +211,7 @@ class ModelCommand : Command {
         }
 
         // fallback 操作需要操作员权限
-        val role = context.role
-        if (role == null || role.ordinal > Role.OPERATOR.ordinal) {
-            return "权限不足，需要操作员角色"
-        }
+        requireOperator(context)?.let { return it }
 
         return when (context.args[1].lowercase()) {
             "add" -> addFallback(context)
@@ -252,10 +248,7 @@ class ModelCommand : Command {
 
     private fun setSummarizeModel(context: CommandContext): String {
         // 压缩模型需要操作员权限
-        val role = context.role
-        if (role == null || role.ordinal > Role.OPERATOR.ordinal) {
-            return "权限不足，需要操作员角色"
-        }
+        requireOperator(context)?.let { return it }
 
         if (context.args.size < 2) return "用法: /model summarize <名称|序号>"
 
@@ -282,13 +275,15 @@ class ModelCommand : Command {
             return models[index - 1].data.id
         }
 
-        // 按名称模糊匹配
+        // 按名称匹配：精确 > 前缀 > 包含
         val lower = input.lowercase()
-        return models.find { it.data.displayName.lowercase().contains(lower) }?.data?.id
+        return models.find { it.data.displayName.equals(lower, ignoreCase = true) }?.data?.id
+            ?: models.find { it.data.displayName.lowercase().startsWith(lower) }?.data?.id
+            ?: models.find { it.data.displayName.lowercase().contains(lower) }?.data?.id
     }
 
     private fun getModelDisplayName(context: CommandContext, id: UUID): String {
         return context.core.config.listModels().find { it.data.id == id }?.data?.displayName
-            ?: id.toString().take(8)
+            ?: "${id.toString().take(8)}（已删除）"
     }
 }

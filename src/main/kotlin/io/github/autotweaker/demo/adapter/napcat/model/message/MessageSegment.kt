@@ -1,6 +1,7 @@
 package io.github.autotweaker.demo.adapter.napcat.model.message
 
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
@@ -71,7 +72,7 @@ sealed interface MessageSegment {
     data class Forward(val id: String) : MessageSegment
 
     /** 未知类型消息段 */
-    data class Unknown(val type: String) : MessageSegment
+    data class Unknown(val type: String, val data: JsonObject? = null) : MessageSegment
 }
 
 /**
@@ -111,7 +112,7 @@ object MessageSegmentSerializer : KSerializer<MessageSegment> {
             "forward" -> MessageSegment.Forward(
                 id = data["id"]?.jsonPrimitive?.content ?: ""
             )
-            else -> MessageSegment.Unknown(type)
+            else -> MessageSegment.Unknown(type, data)
         }
     }
 
@@ -175,6 +176,7 @@ object MessageSegmentSerializer : KSerializer<MessageSegment> {
             }
             is MessageSegment.Unknown -> buildJsonObject {
                 put("type", value.type)
+                value.data?.let { put("data", it) }
             }
         }
         encoder.encodeSerializableValue(JsonObject.serializer(), json)
@@ -191,7 +193,8 @@ object FlexibleIntSerializer : KSerializer<Int> {
 
     override fun deserialize(decoder: Decoder): Int {
         val element = decoder.decodeSerializableValue(JsonPrimitive.serializer())
-        return element.intOrNull ?: element.content.toIntOrNull() ?: 0
+        return element.intOrNull ?: element.content.toIntOrNull()
+            ?: throw SerializationException("Cannot parse Int from: ${element.content}")
     }
 
     override fun serialize(encoder: Encoder, value: Int) {

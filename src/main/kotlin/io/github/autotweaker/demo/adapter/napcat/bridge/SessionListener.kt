@@ -45,7 +45,16 @@ class SessionListener(
     private val lastMessageIds = ConcurrentHashMap<UUID, Set<UUID>>()
 
     /** 会话 → 待审批的工具调用 ID 列表（用于序号反查） */
-    val pendingToolCalls = ConcurrentHashMap<UUID, List<String>>()
+    private val pendingToolCalls = ConcurrentHashMap<UUID, List<String>>()
+
+    /**
+     * 清除指定会话的所有待审批工具调用记录
+     *
+     * @param sessionId 会话 ID
+     */
+    fun clearPendingCalls(sessionId: UUID) {
+        pendingToolCalls.remove(sessionId)
+    }
 
     /**
      * 确保会话的输出和上下文监听器已启动
@@ -60,6 +69,7 @@ class SessionListener(
 
         // 启动输出监听
         if (listeningSessions.add(sessionId)) {
+            lastMessageIds.remove(sessionId)
             scope.launch {
                 try {
                     listenToOutput(sessionId, handle.output)
@@ -137,9 +147,9 @@ class SessionListener(
                 is SessionOutput.Tool -> { /* 丢弃 */ }
 
                 is SessionOutput.ToolRequest -> {
-                    // 覆盖为当前待审批的 callId 列表
+                    // 追加到当前待审批的 callId 列表
                     val callIds = sessionOutput.requests.map { it.callId }
-                    pendingToolCalls[sessionId] = callIds
+                    pendingToolCalls.merge(sessionId, callIds) { old, new -> old + new }
 
                     val prompt = buildString {
                         appendLine("工具调用请求:")
@@ -156,7 +166,7 @@ class SessionListener(
                     sendToSession(sessionId, "LLM 错误: ${sessionOutput.content}")
                 }
                 is SessionOutput.Error -> {
-                    sendToSession(sessionId, "错误: ${sessionOutput.error.message}")
+                    sendToSession(sessionId, "错误: ${sessionOutput.error.message ?: "未知错误"}")
                 }
                 is SessionOutput.Compact -> {
                     when (sessionOutput.output.status) {
@@ -188,13 +198,11 @@ class SessionListener(
     private suspend fun listenToContext(sessionId: UUID, context: StateFlow<SessionContext>) {
         context.collect { sessionContext ->
             val currentIds = getAllMessageIds(sessionContext.index)
-            val previousIds = lastMessageIds[sessionId] ?: emptySet()
-
-            // 先更新状态，避免竞态条件
-            lastMessageIds[sessionId] = currentIds
-
-            // 找出新增的消息 ID
-            val newIds = currentIds - previousIds
+            val newIds = synchronized(lastMessageIds) {
+                val previousIds = lastMessageIds[sessionId] ?: emptySet()
+                lastMessageIds[sessionId] = currentIds
+                currentIds - previousIds
+            }
             if (newIds.isNotEmpty()) {
                 // 加载新增消息
                 val messages = core.session.loadMessages(newIds.toList())
@@ -204,6 +212,8 @@ class SessionListener(
                     for (msg in aiMessages) {
                         msg.content?.let { sendToSession(sessionId, it) }
                     }
+                } else {
+                    logger.warn("loadMessages returned null for session {}", sessionId)
                 }
             }
         }
