@@ -11,7 +11,7 @@ interface Tool {
 
     data class Meta(...)
     data class Function(...)
-    data class ToolInput(...)
+    class ToolInput(...)
     data class RuntimeOutput(...)
     data class ToolOutput(...)
 }
@@ -107,7 +107,7 @@ data class Property(
 ## ToolInput
 
 ```kotlin
-data class ToolInput(
+class ToolInput(
     val functionName: String,
     val arguments: JsonObject,
     val outputChannel: Channel<RuntimeOutput>? = null,

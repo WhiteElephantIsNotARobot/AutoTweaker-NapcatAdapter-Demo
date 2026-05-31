@@ -69,4 +69,4 @@ Runtime persistence uses AutoTweaker `JsonStore` API for sessions, user preferen
 
 ## Dependencies
 
-Core dependency: `io.github.autotweaker:api:0.1.0-alpha.13` from GitHub Packages. API documentation is in `doc/`.
+Core dependency: `io.github.autotweaker:api:0.1.0-alpha.18` from GitHub Packages. API documentation is in `doc/`.

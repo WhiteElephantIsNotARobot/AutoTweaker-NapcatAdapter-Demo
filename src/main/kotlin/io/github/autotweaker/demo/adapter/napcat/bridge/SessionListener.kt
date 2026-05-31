@@ -206,14 +206,10 @@ class SessionListener(
             if (newIds.isNotEmpty()) {
                 // 加载新增消息
                 val messages = core.session.loadMessages(newIds.toList())
-                if (messages != null) {
-                    // 只发送 AI/Assistant 消息，过滤掉用户消息和工具消息
-                    val aiMessages = messages.filterIsInstance<SessionMessage.Assistant>()
-                    for (msg in aiMessages) {
-                        msg.content?.let { sendToSession(sessionId, it) }
-                    }
-                } else {
-                    logger.warn("loadMessages returned null for session {}", sessionId)
+                // 只发送 AI/Assistant 消息，过滤掉用户消息和工具消息
+                val aiMessages = messages.filterIsInstance<SessionMessage.Assistant>()
+                for (msg in aiMessages) {
+                    msg.content?.let { sendToSession(sessionId, it) }
                 }
             }
         }

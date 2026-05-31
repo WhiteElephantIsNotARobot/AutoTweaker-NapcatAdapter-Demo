@@ -10,10 +10,10 @@ interface ConfigAPI {
     fun jsonStore(kClass: KClass<*>): JsonStore
 
     // 环境变量
-    fun listEnv(type: CoreConfig.JsonConfig.Env.Type): List<String>
-    fun getEnv(type: CoreConfig.JsonConfig.Env.Type, id: String): String?
-    fun setEnv(env: List<CoreConfig.JsonConfig.Env>)
-    fun removeEnv(type: CoreConfig.JsonConfig.Env.Type, id: String)
+    suspend fun listEnv(type: CoreConfig.JsonConfig.Env.Type): List<String>
+    suspend fun getEnv(type: CoreConfig.JsonConfig.Env.Type, id: String): String?
+    suspend fun setEnv(env: List<CoreConfig.JsonConfig.Env>)
+    suspend fun removeEnv(type: CoreConfig.JsonConfig.Env.Type, id: String)
 
     // Provider 管理
     fun listProviders(): List<CoreConfig.ProviderConfig.Provider>
@@ -36,7 +36,7 @@ interface ConfigAPI {
     fun updateModelData(id: UUID, model: CoreConfig.ProviderConfig.Model)
 
     // API Key 管理
-    fun addApiKey(key: CoreConfig.ProviderConfig.ApiKey)
+    suspend fun addApiKey(key: CoreConfig.ProviderConfig.ApiKey)
     fun removeApiKey(name: String)
     fun listApiKeyNames(): List<String>
 }
@@ -71,10 +71,10 @@ fun jsonStore(kClass: KClass<*>): JsonStore
 ### listEnv
 
 ```kotlin
-fun listEnv(type: CoreConfig.JsonConfig.Env.Type): List<String>
+suspend fun listEnv(type: CoreConfig.JsonConfig.Env.Type): List<String>
 ```
 
-列出指定类型的所有环境变量 ID。
+列出指定类型的所有环境变量 ID。内部使用 `Mutex` 保证并发安全。
 
 **参数：**
 
@@ -85,7 +85,7 @@ fun listEnv(type: CoreConfig.JsonConfig.Env.Type): List<String>
 ### getEnv
 
 ```kotlin
-fun getEnv(type: CoreConfig.JsonConfig.Env.Type, id: String): String?
+suspend fun getEnv(type: CoreConfig.JsonConfig.Env.Type, id: String): String?
 ```
 
 获取环境变量值。
@@ -95,7 +95,7 @@ fun getEnv(type: CoreConfig.JsonConfig.Env.Type, id: String): String?
 ### setEnv
 
 ```kotlin
-fun setEnv(env: List<CoreConfig.JsonConfig.Env>)
+suspend fun setEnv(env: List<CoreConfig.JsonConfig.Env>)
 ```
 
 批量设置环境变量。已存在的 ID 会被更新。
@@ -103,7 +103,7 @@ fun setEnv(env: List<CoreConfig.JsonConfig.Env>)
 ### removeEnv
 
 ```kotlin
-fun removeEnv(type: CoreConfig.JsonConfig.Env.Type, id: String)
+suspend fun removeEnv(type: CoreConfig.JsonConfig.Env.Type, id: String)
 ```
 
 删除环境变量。ID 不存在时静默处理。
@@ -360,10 +360,10 @@ fun updateModelData(id: UUID, model: CoreConfig.ProviderConfig.Model)
 ### addApiKey
 
 ```kotlin
-fun addApiKey(key: CoreConfig.ProviderConfig.ApiKey)
+suspend fun addApiKey(key: CoreConfig.ProviderConfig.ApiKey)
 ```
 
-添加 API Key。
+添加 API Key。内部通过 `SecretStore` 操作加密存储。
 
 **前置校验：**
 

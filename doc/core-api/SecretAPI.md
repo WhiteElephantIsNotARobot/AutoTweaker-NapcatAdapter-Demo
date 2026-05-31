@@ -8,8 +8,8 @@
 interface SecretAPI {
     val isUnlocked: StateFlow<Boolean>
     fun isPasswordEmpty(): Boolean
-    fun unlock(password: String)
-    fun changePassword(oldPassword: String, newPassword: String)
+    suspend fun unlock(password: String)
+    suspend fun changePassword(oldPassword: String, newPassword: String)
 }
 ```
 
@@ -38,10 +38,10 @@ fun isPasswordEmpty(): Boolean
 ### unlock
 
 ```kotlin
-fun unlock(password: String)
+suspend fun unlock(password: String)
 ```
 
-使用密码解锁密钥库。
+使用密码解锁密钥库。内部使用 `Dispatchers.IO` 执行 GPG 命令。
 
 **参数：**
 
@@ -64,10 +64,10 @@ fun unlock(password: String)
 ### changePassword
 
 ```kotlin
-fun changePassword(oldPassword: String, newPassword: String)
+suspend fun changePassword(oldPassword: String, newPassword: String)
 ```
 
-修改密码。
+修改密码。内部使用 `Mutex` 保证并发安全。
 
 **参数：**
 
