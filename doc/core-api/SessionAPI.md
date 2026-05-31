@@ -27,9 +27,9 @@ interface SessionAPI {
     suspend fun approveToolCall(sessionId: UUID, approvals: List<ToolApprove>)
 
     // 数据加载
-    suspend fun loadData(ids: List<UUID>): List<SessionData>?
+    suspend fun loadData(ids: List<UUID>): List<SessionData>
     suspend fun loadContext(sessionId: UUID): SessionContext?
-    suspend fun loadMessages(ids: List<UUID>): List<SessionMessage>?
+    suspend fun loadMessages(ids: List<UUID>): List<SessionMessage>
     fun getUsageSnapshots(): List<UsageSnapshot>
 
     // 工作区管理
@@ -265,12 +265,12 @@ suspend fun approveToolCall(sessionId: UUID, approvals: List<ToolApprove>)
 ### loadData / loadContext / loadMessages
 
 ```kotlin
-suspend fun loadData(ids: List<UUID>): List<SessionData>?
+suspend fun loadData(ids: List<UUID>): List<SessionData>
 suspend fun loadContext(sessionId: UUID): SessionContext?
-suspend fun loadMessages(ids: List<UUID>): List<SessionMessage>?
+suspend fun loadMessages(ids: List<UUID>): List<SessionMessage>
 ```
 
-从数据库加载会话数据。不会抛异常，ID 不存在时返回 `null`。
+从数据库加载会话数据。不会抛异常，ID 不存在时返回空列表（`loadContext` 仍返回 `null`）。
 
 ### getUsageSnapshots
 

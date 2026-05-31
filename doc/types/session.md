@@ -152,7 +152,7 @@ data class SessionData(
 会话句柄。
 
 ```kotlin
-data class SessionHandle(
+class SessionHandle(
     val id: UUID,
     val context: StateFlow<SessionContext>,
     val output: SharedFlow<SessionOutput>,

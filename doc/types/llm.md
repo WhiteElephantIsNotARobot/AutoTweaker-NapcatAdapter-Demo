@@ -369,7 +369,7 @@ data class Config(
 data class Price(
     val amount: BigDecimal,
     val currency: Currency,
-    val unit: Int
+    val tokenUnit: Int
 )
 ```
 
@@ -377,7 +377,7 @@ data class Price(
 |------|------|------|
 | `amount` | `BigDecimal` | 金额 |
 | `currency` | `Currency` | 货币 |
-| `unit` | `Int` | 单位（token 数） |
+| `tokenUnit` | `Int` | 单位（token 数） |
 
 ---
 

@@ -69,7 +69,7 @@ class SessionCommand : Command {
         }
 
         val sessions = context.core.session.loadData(allSessionIds)
-        if (sessions.isNullOrEmpty()) {
+        if (sessions.isEmpty()) {
             return "没有会话"
         }
 
