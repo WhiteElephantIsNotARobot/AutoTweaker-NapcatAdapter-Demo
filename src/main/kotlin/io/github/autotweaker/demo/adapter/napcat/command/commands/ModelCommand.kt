@@ -198,7 +198,11 @@ class ModelCommand : Command {
         val handle = context.sessionManager.getActiveSessionHandle(context.userId)
         if (handle != null) {
             val config = handle.data.value.config
-            context.core.session.updateConfig(handle.id, config.copy(model = modelId))
+            try {
+                context.core.session.updateConfig(handle.id, config.copy(model = modelId))
+            } catch (e: Exception) {
+                return "我的主模型已设置为: ${getModelDisplayName(context, modelId)}，但当前会话更新失败: ${e.message}"
+            }
             return "我的主模型已设置为: ${getModelDisplayName(context, modelId)}，当前会话已生效"
         }
 

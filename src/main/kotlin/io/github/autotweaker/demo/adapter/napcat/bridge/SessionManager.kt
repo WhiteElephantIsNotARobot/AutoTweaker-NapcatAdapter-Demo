@@ -257,7 +257,14 @@ class SessionManager(
             } else {
                 containerWorkspaces.first()
             }
-            core.session.create(workspace.meta.id, config)
+            try {
+                core.session.create(workspace.meta.id, config)
+            } catch (e: IllegalStateException) {
+                if (e.message?.contains("directory does not exist") == true) {
+                    throw IllegalStateException("容器工作区目录不存在: ${workspace.meta.path}，请联系操作员检查")
+                }
+                throw e
+            }
         }
 
         val handle = core.session.getHandle(sessionId)
