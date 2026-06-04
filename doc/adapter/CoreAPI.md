@@ -11,9 +11,11 @@ interface CoreAPI {
     val config: ConfigAPI
     val secret: SecretAPI
     val i18n: I18nAPI
+    val trace: TraceAPI
 
     fun chat(request: CoreLlmRequest): Flow<CoreLlmResult>
     fun bash(arg: ShellExec): Flow<ShellEvent>
+    fun trace(kClass: KClass<*>): TraceRecorder
 }
 ```
 
@@ -26,6 +28,7 @@ interface CoreAPI {
 | `config` | `ConfigAPI` | 配置管理 |
 | `secret` | `SecretAPI` | 密钥管理 |
 | `i18n` | `I18nAPI` | 国际化管理 |
+| `trace` | `TraceAPI` | 追踪记录管理 |
 
 ## 方法
 
@@ -125,6 +128,31 @@ core.bash(exec).collect { event ->
 }
 ```
 
+### trace
+
+```kotlin
+fun trace(kClass: KClass<*>): TraceRecorder
+```
+
+获取指定类的追踪记录器。
+
+**参数：**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `kClass` | `KClass<*>` | 追踪来源的 Kotlin 类 |
+
+**返回值：** `TraceRecorder` 追踪记录器实例
+
+**示例：**
+
+```kotlin
+val recorder = core.trace(MyAdapter::class)
+recorder.add("my-namespace", "操作完成")
+```
+
+---
+
 ## 子接口索引
 
 | 接口 | 说明 | 文档 |
@@ -134,3 +162,98 @@ core.bash(exec).collect { event ->
 | [ConfigAPI](../core-api/ConfigAPI.md) | 配置管理 | 环境变量/Provider/Model/ApiKey |
 | [SecretAPI](../core-api/SecretAPI.md) | 密钥管理 | 解锁/修改密码 |
 | [I18nAPI](../core-api/I18nAPI.md) | 国际化管理 | 翻译模型/状态 |
+| [TraceAPI](#traceapi) | 追踪记录管理 | 查询/删除追踪记录 |
+
+---
+
+## TraceAPI
+
+追踪记录管理接口。
+
+```kotlin
+interface TraceAPI {
+    suspend fun origins(): List<String>
+    suspend fun namespaces(origin: String): List<String>
+    suspend fun entries(origin: String, namespace: String, range: UIntRange): List<Instant>
+    suspend fun get(origin: String, namespace: String, timestamp: Instant): String?
+    suspend fun delete(origin: String, namespace: String, timestamp: Instant)
+}
+```
+
+### origins
+
+```kotlin
+suspend fun origins(): List<String>
+```
+
+获取所有追踪来源。
+
+**返回值：** `List<String>` 来源列表
+
+### namespaces
+
+```kotlin
+suspend fun namespaces(origin: String): List<String>
+```
+
+获取指定来源的所有命名空间。
+
+**参数：**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `origin` | `String` | 追踪来源 |
+
+**返回值：** `List<String>` 命名空间列表
+
+### entries
+
+```kotlin
+suspend fun entries(origin: String, namespace: String, range: UIntRange): List<Instant>
+```
+
+获取指定来源和命名空间的追踪条目时间戳列表。
+
+**参数：**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `origin` | `String` | 追踪来源 |
+| `namespace` | `String` | 命名空间 |
+| `range` | `UIntRange` | 索引范围 |
+
+**返回值：** `List<Instant>` 时间戳列表
+
+### get
+
+```kotlin
+suspend fun get(origin: String, namespace: String, timestamp: Instant): String?
+```
+
+获取指定条目的内容。
+
+**参数：**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `origin` | `String` | 追踪来源 |
+| `namespace` | `String` | 命名空间 |
+| `timestamp` | `Instant` | 条目时间戳 |
+
+**返回值：** `String?` 条目内容，不存在则返回 null
+
+### delete
+
+```kotlin
+suspend fun delete(origin: String, namespace: String, timestamp: Instant)
+```
+
+删除指定条目。
+
+**参数：**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `origin` | `String` | 追踪来源 |
+| `namespace` | `String` | 命名空间 |
+| `timestamp` | `Instant` | 条目时间戳 |

@@ -288,6 +288,10 @@ data class ModelData(
 )
 ```
 
+**校验规则：**
+
+- `displayName`：不能为空白
+
 ### ModelInfo
 
 ```kotlin
@@ -304,6 +308,12 @@ data class ModelInfo(
     val supportsJsonOutput: Boolean,
 )
 ```
+
+**校验规则：**
+
+- `modelId`：不能为空白
+- `contextWindow`：必须 `> 0`
+- `maxOutputTokens`：必须 `> 0`
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -327,6 +337,11 @@ data class TokenPrice(
 )
 ```
 
+**校验规则：**
+
+- `inputPrice` 和 `outputPrice`：不能为空
+- 价格阶梯必须连续覆盖：从 `fromTokens = 0` 开始，到最后一个 `toTokens = null`（无上限），中间无间隙或重叠
+
 ### PriceTier
 
 ```kotlin
@@ -339,6 +354,11 @@ data class PriceTier(
 )
 ```
 
+**校验规则：**
+
+- `fromTokens`：必须 `>= 0`
+- `toTokens`：若非 null，必须 `> fromTokens`
+
 ### Config
 
 ```kotlin
@@ -347,7 +367,7 @@ data class Config(
     val temperature: Double?,
     val maxTokens: Int?,
     val compactContextUsage: Double?,
-    val compactTotalTokens: Double?,
+    val compactTotalTokens: Int?,
 )
 ```
 
@@ -356,7 +376,14 @@ data class Config(
 | `temperature` | `Double?` | 温度 |
 | `maxTokens` | `Int?` | 最大输出 token 数 |
 | `compactContextUsage` | `Double?` | 触发压缩的上下文使用率阈值 |
-| `compactTotalTokens` | `Double?` | 触发压缩的总 token 数阈值 |
+| `compactTotalTokens` | `Int?` | 触发压缩的总 token 数阈值 |
+
+**校验规则：**
+
+- `temperature`：若非 null，必须在 `[0.0, 2.0]` 范围内
+- `maxTokens`：若非 null，必须 `> 0`
+- `compactContextUsage`：若非 null，必须在 `(0.0, 1.0]` 范围内
+- `compactTotalTokens`：若非 null，必须 `> 0`
 
 ---
 
@@ -379,6 +406,11 @@ data class Price(
 | `currency` | `Currency` | 货币 |
 | `tokenUnit` | `Int` | 单位（token 数） |
 
+**校验规则：**
+
+- `amount`：必须 `>= 0`
+- `tokenUnit`：必须 `> 0`
+
 ---
 
 ## ProviderData
@@ -397,6 +429,10 @@ data class ProviderData(
 )
 ```
 
+**校验规则：**
+
+- `errorHandlingRules`：不允许重复的 `statusCode`
+
 ### ErrorHandlingRule
 
 ```kotlin
@@ -406,6 +442,10 @@ data class ErrorHandlingRule(
     val strategy: RecoveryStrategy
 )
 ```
+
+**校验规则：**
+
+- `statusCode`：必须在 `100..599` 范围内（有效的 HTTP 状态码）
 
 ### RecoveryStrategy
 

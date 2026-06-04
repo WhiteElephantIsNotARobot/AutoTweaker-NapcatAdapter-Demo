@@ -1,6 +1,6 @@
 # AutoTweaker API 文档
 
-> 版本: v0.1.0-alpha.19
+> 版本: v0.1.0-alpha.20
 > 源码: [github.com/AutoTweaker/core](https://github.com/AutoTweaker/core/tree/main/api/src/main/kotlin/io/github/autotweaker/api)
 
 ## 概述
@@ -29,6 +29,7 @@ AutoTweaker API 定义了适配器（Adapter）开发所需的全部接口和数
 | ConfigAPI | 配置管理 | [core-api/ConfigAPI.md](core-api/ConfigAPI.md) |
 | SecretAPI | 密钥管理 | [core-api/SecretAPI.md](core-api/SecretAPI.md) |
 | I18nAPI | 国际化管理 | [core-api/I18nAPI.md](core-api/I18nAPI.md) |
+| TraceAPI | 追踪记录管理 | [adapter/CoreAPI.md](adapter/CoreAPI.md#traceapi) |
 
 ### 服务接口
 
@@ -49,6 +50,7 @@ AutoTweaker API 定义了适配器（Adapter）开发所需的全部接口和数
 | LLM | 聊天消息、请求、结果、模型数据 | [types/llm.md](types/llm.md) |
 | Session | 会话上下文、消息、输出、工作区 | [types/session.md](types/session.md) |
 | Shell | Shell 事件、执行、结果 | [types/shell.md](types/shell.md) |
+| Trace | 追踪记录器 | [types/trace.md](types/trace.md) |
 | Adapter | 适配器信息 | [types/adapter.md](types/adapter.md) |
 
 ## 调用规范
