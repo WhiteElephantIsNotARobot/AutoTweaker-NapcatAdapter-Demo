@@ -2,6 +2,7 @@ package io.github.autotweaker.demo.adapter.napcat.command.commands
 
 import io.github.autotweaker.api.types.config.CoreConfig
 import io.github.autotweaker.api.types.llm.ModelData
+import io.github.autotweaker.api.trace.TraceRecorder
 import io.github.autotweaker.demo.adapter.napcat.command.Command
 import io.github.autotweaker.demo.adapter.napcat.command.CommandContext
 import io.github.autotweaker.demo.adapter.napcat.permission.Role
@@ -24,12 +25,15 @@ import java.util.UUID
  */
 class ModelCommand : Command {
 
+    private lateinit var trace: TraceRecorder
+
     override val name = "model"
     override val description = "管理模型配置"
     override val usage = "/model [list|create|delete|set|fallback|summarize] [参数]"
     override val requiredRole = Role.USER
 
     override suspend fun execute(context: CommandContext): String {
+        if (!::trace.isInitialized) trace = context.core.trace(this::class)
         if (context.args.isEmpty()) {
             return showCurrentConfig(context)
         }
@@ -124,6 +128,7 @@ class ModelCommand : Command {
         val providerMeta = try {
             context.core.config.getProviderMeta(provider.type)
         } catch (e: Exception) {
+            trace.add("e", e.toString())
             return "获取提供商元数据失败: ${e.message}"
         }
 
@@ -149,8 +154,10 @@ class ModelCommand : Command {
                 )
             )
             context.core.config.addModel(model)
+            trace.add("model_add", model.toString())
             "模型已创建: $displayName\n提供商: $providerName\n模型ID: $modelId"
         } catch (e: Exception) {
+            trace.add("e", e.toString())
             "创建模型失败: ${e.message}"
         }
     }
@@ -182,6 +189,7 @@ class ModelCommand : Command {
             context.core.config.removeModel(model.data.id)
             "已删除模型: ${model.data.displayName}"
         } catch (e: Exception) {
+            trace.add("e", e.toString())
             "删除模型失败: ${e.message}"
         }
     }
@@ -200,7 +208,9 @@ class ModelCommand : Command {
             val config = handle.data.value.config
             try {
                 context.core.session.updateConfig(handle.id, config.copy(model = modelId))
+                trace.add("session_config_update", "session=${handle.id}, config=${config.copy(model = modelId)}")
             } catch (e: Exception) {
+                trace.add("e", e.toString())
                 return "我的主模型已设置为: ${getModelDisplayName(context, modelId)}，但当前会话更新失败: ${e.message}"
             }
             return "我的主模型已设置为: ${getModelDisplayName(context, modelId)}，当前会话已生效"

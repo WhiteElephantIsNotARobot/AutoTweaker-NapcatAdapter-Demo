@@ -34,6 +34,8 @@ interface ConfigAPI {
     fun addModel(model: CoreConfig.ProviderConfig.Model)
     fun removeModel(id: UUID)
     fun updateModelData(id: UUID, model: CoreConfig.ProviderConfig.Model)
+    fun getDefaultModel(): UUID?
+    fun setDefaultModel(id: UUID)
 
     // API Key 管理
     suspend fun addApiKey(key: CoreConfig.ProviderConfig.ApiKey)
@@ -352,6 +354,34 @@ fun updateModelData(id: UUID, model: CoreConfig.ProviderConfig.Model)
 | 异常 | 条件 | 预防 |
 |------|------|------|
 | `IllegalArgumentException` | 同 Provider 下 `displayName` 重复（排除自身） | 先调用 `listModels()` 检查 |
+
+### getDefaultModel
+
+```kotlin
+fun getDefaultModel(): UUID?
+```
+
+获取全局默认模型 ID。未设置时返回 `null`。
+
+**返回值：** 默认模型 UUID，或 `null`
+
+### setDefaultModel
+
+```kotlin
+fun setDefaultModel(id: UUID)
+```
+
+设置全局默认模型。
+
+**前置校验：**
+
+- 通过 `listModelIds()` 确认 `id` 存在
+
+**异常：**
+
+| 异常 | 条件 | 预防 |
+|------|------|------|
+| `IllegalArgumentException` | 模型 ID 不存在 | 先调用 `listModelIds()` |
 
 ## API Key 管理
 

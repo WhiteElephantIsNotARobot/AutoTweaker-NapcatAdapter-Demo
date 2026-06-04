@@ -1,6 +1,7 @@
 package io.github.autotweaker.demo.adapter.napcat.command.commands
 
 import io.github.autotweaker.api.types.agent.ToolApprove
+import io.github.autotweaker.api.trace.TraceRecorder
 import io.github.autotweaker.demo.adapter.napcat.command.Command
 import io.github.autotweaker.demo.adapter.napcat.command.CommandContext
 import io.github.autotweaker.demo.adapter.napcat.permission.Role
@@ -15,6 +16,7 @@ import org.slf4j.LoggerFactory
 class RejectCommand : Command {
 
     private val logger = LoggerFactory.getLogger(RejectCommand::class.java)
+    private lateinit var trace: TraceRecorder
 
     override val name = "reject"
     override val description = "拒绝工具调用请求"
@@ -22,6 +24,7 @@ class RejectCommand : Command {
     override val requiredRole = Role.USER
 
     override suspend fun execute(context: CommandContext): String {
+        if (!::trace.isInitialized) trace = context.core.trace(this::class)
         val handle = context.sessionManager.getActiveSessionHandle(context.userId)
             ?: return "当前没有活跃会话，请先 /new 或 /enter 一个会话"
 
@@ -57,9 +60,11 @@ class RejectCommand : Command {
         return try {
             val approvals = listOf(ToolApprove(callId = callId, reason = reason, approved = false))
             context.core.session.approveToolCall(handle.id, approvals)
+            trace.add("session_approve", "session=${handle.id}, approvals=$approvals")
             "已拒绝工具调用: $callId"
         } catch (e: Exception) {
             logger.error("Reject failed", e)
+            trace.add("e", e.toString())
             "拒绝失败，请稍后重试"
         }
     }

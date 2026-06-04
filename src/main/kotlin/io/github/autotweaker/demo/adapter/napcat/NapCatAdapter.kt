@@ -49,7 +49,7 @@ class NapCatAdapter : Adapter {
     private var messageBridge: MessageBridge? = null
     private var adapterScope: CoroutineScope? = null
 
-    override fun load(coreVersion: SemVer): AdapterInfo {
+    override suspend fun load(coreVersion: SemVer): AdapterInfo {
         logger.info("Loading NapCat adapter")
         return AdapterInfo(
             name = "napcat",
@@ -59,7 +59,7 @@ class NapCatAdapter : Adapter {
         )
     }
 
-    override fun start(core: CoreAPI) {
+    override suspend fun start(core: CoreAPI) {
         initializationState = "STARTING"
         _core = core
         logger.info("NapCat adapter starting...")
@@ -78,7 +78,7 @@ class NapCatAdapter : Adapter {
 
         // 已解锁，直接初始化
         initializationState = "INITIALIZING"
-        initializeComponentsBlocking(core)
+        initializeComponents(core)
         initializationState = "READY"
     }
 
@@ -93,13 +93,6 @@ class NapCatAdapter : Adapter {
             throw e
         } catch (e: Exception) {
             logger.error("Failed to initialize after unlock", e)
-        }
-    }
-
-    /** 同步初始化组件，会阻塞当前线程。仅在密钥库已解锁时调用。 */
-    private fun initializeComponentsBlocking(core: CoreAPI) {
-        runBlocking {
-            initializeComponents(core)
         }
     }
 
@@ -170,17 +163,15 @@ class NapCatAdapter : Adapter {
         this.messageBridge = bridge
     }
 
-    override fun stop() {
+    override suspend fun stop() {
         initializationState = "STOPPED"
         logger.info("Stopping NapCat adapter...")
         // 取消所有协程（包括输出监听器）
         adapterScope?.cancel()
-        runBlocking {
-            try {
-                wsClient?.disconnect()
-            } catch (e: Exception) {
-                logger.error("Error disconnecting from NapCat", e)
-            }
+        try {
+            wsClient?.disconnect()
+        } catch (e: Exception) {
+            logger.error("Error disconnecting from NapCat", e)
         }
         wsClient = null
         messageBridge = null

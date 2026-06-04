@@ -42,7 +42,7 @@ class MessageBridge(
 ) {
 
     private val logger = LoggerFactory.getLogger(MessageBridge::class.java)
-    private val trace = core.trace(MessageBridge::class)
+    private val trace = core.trace(this::class)
 
     private val contextBuilder = ContextBuilder(napCat)
 
@@ -99,8 +99,6 @@ class MessageBridge(
             return
         }
 
-        trace.add("message", "user=$userId, group=$groupId, text=$text")
-
         // 尝试命令分发
         val context = createContext(userId, groupId)
         val commandResult = commandRegistry.dispatch(text, context)
@@ -133,8 +131,6 @@ class MessageBridge(
                 return
             }
         }
-
-        trace.add("message", "user=$userId, text=$text")
 
         // 尝试命令分发
         val context = createContext(userId, null)
@@ -186,6 +182,7 @@ class MessageBridge(
                 sendReply(groupId, userId, "已自动创建并进入会话")
             } catch (e: Exception) {
                 logger.error("Failed to auto-create session for user {}", userId, e)
+                trace.add("e", e.toString())
                 sendReply(groupId, userId, "无法自动创建会话，请稍后重试")
                 return
             }
@@ -212,9 +209,10 @@ class MessageBridge(
             // 构建带上下文的消息
             val messageWithContext = contextBuilder.buildMessageWithContext(groupId, userId, processedText)
             core.session.send(handle.id, messageWithContext)
-            trace.add("send", "session=${handle.id}, message=$messageWithContext")
+            trace.add("session_send", "session=${handle.id}, message=$messageWithContext")
         } catch (e: Exception) {
             logger.error("Failed to send message to session {}", handle.id, e)
+            trace.add("e", e.toString())
             sendReply(groupId, userId, "消息发送失败，请稍后重试")
         }
     }
@@ -255,6 +253,7 @@ class MessageBridge(
             }
         } catch (e: Exception) {
             logger.error("Failed to send reply to user {} group {}", userId, groupId, e)
+            trace.add("e", e.toString())
         }
     }
 

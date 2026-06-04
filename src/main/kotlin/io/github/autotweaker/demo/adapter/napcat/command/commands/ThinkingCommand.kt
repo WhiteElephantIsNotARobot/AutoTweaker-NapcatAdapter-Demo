@@ -1,5 +1,6 @@
 package io.github.autotweaker.demo.adapter.napcat.command.commands
 
+import io.github.autotweaker.api.trace.TraceRecorder
 import io.github.autotweaker.demo.adapter.napcat.command.Command
 import io.github.autotweaker.demo.adapter.napcat.command.CommandContext
 import io.github.autotweaker.demo.adapter.napcat.permission.Role
@@ -19,6 +20,7 @@ import org.slf4j.LoggerFactory
 class ThinkingCommand : Command {
 
     private val logger = LoggerFactory.getLogger(ThinkingCommand::class.java)
+    private lateinit var trace: TraceRecorder
 
     override val name = "thinking"
     override val description = "开关思考模式"
@@ -26,6 +28,7 @@ class ThinkingCommand : Command {
     override val requiredRole = Role.USER
 
     override suspend fun execute(context: CommandContext): String {
+        if (!::trace.isInitialized) trace = context.core.trace(this::class)
         if (context.args.isEmpty()) {
             return showStatus(context)
         }
@@ -52,8 +55,10 @@ class ThinkingCommand : Command {
             val config = handle.data.value.config
             try {
                 context.core.session.updateConfig(handle.id, config.copy(thinking = enabled))
+                trace.add("session_config_update", "session=${handle.id}, config=${config.copy(thinking = enabled)}")
             } catch (e: Exception) {
                 logger.debug("Failed to update thinking config", e)
+                trace.add("e", e.toString())
             }
             return "思考模式已$state，当前会话已生效"
         }

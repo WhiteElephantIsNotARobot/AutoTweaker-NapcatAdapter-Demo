@@ -30,6 +30,7 @@ class SessionManager(
 ) {
 
     private val logger = LoggerFactory.getLogger(SessionManager::class.java)
+    private val trace = core.trace(this::class)
 
     /** userId → sessionId */
     private val activeSessions = ConcurrentHashMap<Long, UUID>()
@@ -89,6 +90,7 @@ class SessionManager(
             core.session.getHandle(sessionId)
         } catch (e: Exception) {
             logger.warn("Failed to get handle for session {}", sessionId, e)
+            trace.add("e", e.toString())
             null
         }
     }
@@ -236,6 +238,7 @@ class SessionManager(
                         core.session.create(workspace.meta.id, config)
                     } catch (e: Exception) {
                         logger.warn("Failed to create session with workspace {}, falling back to default", selectedWorkspaceId, e)
+                        trace.add("e", e.toString())
                         core.session.create(config)
                     }
                 } else {
@@ -260,6 +263,7 @@ class SessionManager(
             try {
                 core.session.create(workspace.meta.id, config)
             } catch (e: IllegalStateException) {
+                trace.add("e", e.toString())
                 if (e.message?.contains("directory does not exist") == true) {
                     throw IllegalStateException("容器工作区目录不存在: ${workspace.meta.path}，请联系操作员检查")
                 }
@@ -267,6 +271,7 @@ class SessionManager(
             }
         }
 
+        trace.add("session_create", config.toString())
         val handle = core.session.getHandle(sessionId)
         core.session.updateTitle(sessionId, title)
         setActiveSession(userId, sessionId)

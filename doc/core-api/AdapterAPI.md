@@ -6,18 +6,20 @@
 
 ```kotlin
 interface AdapterAPI {
-    fun listAdapter(): List<AdapterInfo>
-    fun startAdapter(name: String)
-    fun stopAdapter(name: String)
+    suspend fun listAdapter(): List<AdapterInfo>
+    suspend fun startAdapter(name: String)
+    suspend fun stopAdapter(name: String)
 }
 ```
+
+> **v0.1.0-alpha.21 起：** 三个方法均为 `suspend fun`。
 
 ## 方法
 
 ### listAdapter
 
 ```kotlin
-fun listAdapter(): List<AdapterInfo>
+suspend fun listAdapter(): List<AdapterInfo>
 ```
 
 列出所有已注册的适配器信息。
@@ -27,7 +29,7 @@ fun listAdapter(): List<AdapterInfo>
 ### startAdapter
 
 ```kotlin
-fun startAdapter(name: String)
+suspend fun startAdapter(name: String)
 ```
 
 按名称启动适配器。
@@ -47,7 +49,7 @@ fun startAdapter(name: String)
 ### stopAdapter
 
 ```kotlin
-fun stopAdapter(name: String)
+suspend fun stopAdapter(name: String)
 ```
 
 按名称停止适配器。

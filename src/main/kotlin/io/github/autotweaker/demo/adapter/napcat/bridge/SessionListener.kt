@@ -34,6 +34,7 @@ class SessionListener(
 ) {
 
     private val logger = LoggerFactory.getLogger(SessionListener::class.java)
+    private val trace = core.trace(this::class)
 
     /** 正在监听输出的会话集合，防止重复监听 */
     private val listeningSessions = ConcurrentHashMap.newKeySet<UUID>()
@@ -64,6 +65,7 @@ class SessionListener(
             core.session.getHandle(sessionId)
         } catch (e: Exception) {
             logger.warn("Failed to get handle for session {}", sessionId, e)
+            trace.add("e", e.toString())
             return
         }
 
@@ -132,9 +134,11 @@ class SessionListener(
         return try {
             val approvals = callIds.map { ToolApprove(callId = it, approved = true) }
             core.session.approveToolCall(handleId, approvals)
+            trace.add("session_approve", "session=$handleId, approvals=$approvals")
             pendingToolCalls.remove(handleId)
             "已审批全部 ${callIds.size} 个工具调用"
         } catch (e: Exception) {
+            trace.add("e", e.toString())
             "审批失败: ${e.message}"
         }
     }
@@ -261,6 +265,7 @@ class SessionListener(
         val handle = try {
             core.session.getHandle(sessionId)
         } catch (e: Exception) {
+            trace.add("e", e.toString())
             return null
         }
         val context = handle.context.value

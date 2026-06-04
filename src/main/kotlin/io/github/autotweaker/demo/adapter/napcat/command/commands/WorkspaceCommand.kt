@@ -1,6 +1,7 @@
 package io.github.autotweaker.demo.adapter.napcat.command.commands
 
 import io.github.autotweaker.api.types.session.WorkspaceMeta
+import io.github.autotweaker.api.trace.TraceRecorder
 import io.github.autotweaker.demo.adapter.napcat.command.Command
 import io.github.autotweaker.demo.adapter.napcat.command.CommandContext
 import io.github.autotweaker.demo.adapter.napcat.permission.Role
@@ -29,6 +30,8 @@ class WorkspaceCommand : Command {
             path.startsWith(CONTAINER_WORKSPACE_PREFIX)
     }
 
+    private lateinit var trace: TraceRecorder
+
     override val name = "workspace"
     override val description = "管理工作区"
     override val usage = "/workspace [select|create|delete] [参数]"
@@ -36,6 +39,7 @@ class WorkspaceCommand : Command {
     override val requiredRole = Role.USER
 
     override suspend fun execute(context: CommandContext): String {
+        if (!::trace.isInitialized) trace = context.core.trace(this::class)
         if (context.args.isEmpty()) {
             return listWorkspaces(context)
         }
@@ -108,7 +112,7 @@ class WorkspaceCommand : Command {
         return "已选择工作区: ${workspace.meta.displayName}"
     }
 
-    private fun createWorkspace(context: CommandContext): String {
+    private suspend fun createWorkspace(context: CommandContext): String {
         // 创建工作区需要操作员权限
         val role = context.role
         if (role == null || role.level < Role.OPERATOR.level) {
@@ -155,8 +159,10 @@ class WorkspaceCommand : Command {
                 path = path
             )
             val workspace = context.core.session.createWorkspace(meta)
+            trace.add("workspace_create", meta.toString())
             "工作区已创建: ${workspace.meta.displayName}\n路径: ${workspace.meta.path}"
         } catch (e: Exception) {
+            trace.add("e", e.toString())
             "创建工作区失败: ${e.message}"
         }
     }
@@ -204,6 +210,7 @@ class WorkspaceCommand : Command {
             context.core.session.deleteWorkspace(workspace.meta.id)
             "已删除工作区: ${workspace.meta.displayName}"
         } catch (e: Exception) {
+            trace.add("e", e.toString())
             "删除工作区失败: ${e.message}"
         }
     }

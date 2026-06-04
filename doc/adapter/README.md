@@ -4,9 +4,9 @@
 
 ```kotlin
 interface Adapter {
-    fun load(coreVersion: SemVer): AdapterInfo
-    fun start(core: CoreAPI)
-    fun stop()
+    suspend fun load(coreVersion: SemVer): AdapterInfo
+    suspend fun start(core: CoreAPI)
+    suspend fun stop()
 }
 ```
 
@@ -17,6 +17,8 @@ interface Adapter {
 | `load` | `coreVersion: SemVer` | `AdapterInfo` | 加载适配器，传入核心版本，返回适配器信息 |
 | `start` | `core: CoreAPI` | `Unit` | 启动适配器，传入核心 API 实例 |
 | `stop` | - | `Unit` | 停止适配器，清理资源 |
+
+> **v0.1.0-alpha.21 起：** 三个方法均为 `suspend fun`，可在实现中直接调用挂起函数。
 
 ## 生命周期
 
@@ -33,7 +35,7 @@ interface Adapter {
 
 ```kotlin
 class MyAdapter : Adapter {
-    override fun load(coreVersion: SemVer): AdapterInfo {
+    override suspend fun load(coreVersion: SemVer): AdapterInfo {
         return AdapterInfo(
             name = "my-adapter",
             description = "示例适配器",
@@ -42,11 +44,11 @@ class MyAdapter : Adapter {
         )
     }
 
-    override fun start(core: CoreAPI) {
+    override suspend fun start(core: CoreAPI) {
         // 初始化逻辑
     }
 
-    override fun stop() {
+    override suspend fun stop() {
         // 清理逻辑
     }
 }
@@ -80,7 +82,7 @@ class MyAdapter : Adapter {
             private set
     }
 
-    override fun start(core: CoreAPI) {
+    override suspend fun start(core: CoreAPI) {
         this.core = core
     }
 }
