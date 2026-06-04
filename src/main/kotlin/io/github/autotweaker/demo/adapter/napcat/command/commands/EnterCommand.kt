@@ -34,6 +34,9 @@ class EnterCommand : Command {
         return try {
             context.sessionManager.enterSession(context.userId, sessionId)
             "已进入会话: $sessionId"
+        } catch (e: IllegalStateException) {
+            logger.warn("Failed to enter session {}: {}", sessionId, e.message)
+            "会话恢复失败: ${e.message}"
         } catch (e: Exception) {
             logger.warn("Failed to enter session", e)
             "会话不存在: $sessionId"
