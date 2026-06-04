@@ -84,10 +84,8 @@ class NapCatWsClientImpl(
 
                     try {
                         for (frame in incoming) {
-                            logger.debug("Received frame: {}", frame)
                             if (frame is Frame.Text) {
                                 val text = frame.readText()
-                                logger.debug("Received text: {}", text)
                                 trace.add("response", text)
                                 launch {
                                     handleMessage(text)
@@ -265,7 +263,6 @@ class NapCatWsClientImpl(
             put("echo", echo)
         }
 
-        logger.debug("Sending: {}", request)
         trace.add("request", "action=$action, echo=$echo, params=$params")
         val channel = Channel<JsonObject>(1)
         pendingRequests[echo] = channel

@@ -42,6 +42,7 @@ class MessageBridge(
 ) {
 
     private val logger = LoggerFactory.getLogger(MessageBridge::class.java)
+    private val trace = core.trace(MessageBridge::class)
 
     private val contextBuilder = ContextBuilder(napCat)
 
@@ -98,7 +99,7 @@ class MessageBridge(
             return
         }
 
-        logger.debug("Group message from user {} in group {}, length={}", userId, groupId, text.length)
+        trace.add("message", "user=$userId, group=$groupId, text=$text")
 
         // 尝试命令分发
         val context = createContext(userId, groupId)
@@ -133,7 +134,7 @@ class MessageBridge(
             }
         }
 
-        logger.debug("Private message from user {}, length={}", userId, text.length)
+        trace.add("message", "user=$userId, text=$text")
 
         // 尝试命令分发
         val context = createContext(userId, null)
@@ -211,6 +212,7 @@ class MessageBridge(
             // 构建带上下文的消息
             val messageWithContext = contextBuilder.buildMessageWithContext(groupId, userId, processedText)
             core.session.send(handle.id, messageWithContext)
+            trace.add("send", "session=${handle.id}, message=$messageWithContext")
         } catch (e: Exception) {
             logger.error("Failed to send message to session {}", handle.id, e)
             sendReply(groupId, userId, "消息发送失败，请稍后重试")
