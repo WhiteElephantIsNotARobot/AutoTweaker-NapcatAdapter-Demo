@@ -71,7 +71,8 @@ class SessionListener(
 
         // 启动输出监听
         if (listeningSessions.add(sessionId)) {
-            lastMessageIds.remove(sessionId)
+            // 仅在首次监听时用当前消息 ID 初始化，避免重启后重发已有消息
+            lastMessageIds.putIfAbsent(sessionId, getAllMessageIds(handle.context.value.index))
             scope.launch {
                 try {
                     listenToOutput(sessionId, handle.output)
