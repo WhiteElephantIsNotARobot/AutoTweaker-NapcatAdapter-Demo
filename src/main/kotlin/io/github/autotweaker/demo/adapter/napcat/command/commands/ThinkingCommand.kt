@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory
  * Thinking 开关命令
  *
  * 用户权限：
- *   /thinking - 查看当前 thinking 状态
+ *   /thinking - 切换 thinking 状态
  *   /thinking on - 开启 thinking
  *   /thinking off - 关闭 thinking
  *
@@ -29,20 +29,19 @@ class ThinkingCommand : Command {
 
     override suspend fun execute(context: CommandContext): String {
         if (!::trace.isInitialized) trace = context.core.trace(this::class)
-        if (context.args.isEmpty()) {
-            return showStatus(context)
+
+        val newEnabled = if (context.args.isEmpty()) {
+            // 无参数：切换状态
+            !context.sessionManager.getUserThinking(context.userId)
+        } else {
+            when (context.args[0].lowercase()) {
+                "on", "enable", "true", "1" -> true
+                "off", "disable", "false", "0" -> false
+                else -> return "未知参数: ${context.args[0]}\n用法: $usage"
+            }
         }
 
-        return when (context.args[0].lowercase()) {
-            "on", "enable", "true", "1" -> setThinking(context, true)
-            "off", "disable", "false", "0" -> setThinking(context, false)
-            else -> "未知参数: ${context.args[0]}\n用法: $usage"
-        }
-    }
-
-    private fun showStatus(context: CommandContext): String {
-        val enabled = context.sessionManager.getUserThinking(context.userId)
-        return "思考模式: ${if (enabled) "开启" else "关闭"}\n用法: /thinking [on|off]"
+        return setThinking(context, newEnabled)
     }
 
     private suspend fun setThinking(context: CommandContext, enabled: Boolean): String {

@@ -10,7 +10,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 /**
  * 会话数据持久化
  *
- * 负责将会话映射、用户模型/工作区/thinking 配置、全局模型配置
+ * 负责将会话映射、用户模型/工作区/thinking/历史注入配置、全局模型配置
  * 序列化到 [JsonStore] 和从其中反序列化。
  *
  * @property store JSON 持久化存储
@@ -18,6 +18,7 @@ import java.util.concurrent.CopyOnWriteArrayList
  * @property userPrimaryModels 用户主模型
  * @property userSelectedWorkspaces 用户工作区
  * @property userThinking 用户 thinking 设置
+ * @property userHistoryInjection 用户消息历史注入设置
  * @property globalFallbackModels 全局备选模型
  * @property globalSummarizeModel 全局压缩模型
  */
@@ -27,6 +28,7 @@ class SessionPersistence(
     private val userPrimaryModels: ConcurrentHashMap<Long, UUID>,
     private val userSelectedWorkspaces: ConcurrentHashMap<Long, UUID>,
     private val userThinking: ConcurrentHashMap<Long, Boolean>,
+    private val userHistoryInjection: ConcurrentHashMap<Long, Boolean>,
     private val globalFallbackModels: CopyOnWriteArrayList<UUID>,
     private val globalSummarizeModel: () -> UUID?
 ) {
@@ -38,6 +40,7 @@ class SessionPersistence(
         private const val USER_MODELS_KEY = "user_models"
         private const val USER_WORKSPACES_KEY = "user_workspaces"
         private const val USER_THINKING_KEY = "user_thinking"
+        private const val USER_HISTORY_INJECTION_KEY = "user_history_injection"
         private const val GLOBAL_CONFIG_KEY = "global_config"
     }
 
@@ -53,10 +56,11 @@ class SessionPersistence(
             obj[USER_MODELS_KEY]?.let { loadUserModels(it) }
             obj[USER_WORKSPACES_KEY]?.let { loadUserWorkspaces(it) }
             obj[USER_THINKING_KEY]?.let { loadUserThinking(it) }
+            obj[USER_HISTORY_INJECTION_KEY]?.let { loadUserHistoryInjection(it) }
             obj[GLOBAL_CONFIG_KEY]?.let { loadGlobalConfig(it) }
 
-            logger.debug("Loaded {} sessions, {} user models, {} user workspaces, {} user thinking",
-                activeSessions.size, userPrimaryModels.size, userSelectedWorkspaces.size, userThinking.size)
+            logger.debug("Loaded {} sessions, {} user models, {} user workspaces, {} user thinking, {} user history injection",
+                activeSessions.size, userPrimaryModels.size, userSelectedWorkspaces.size, userThinking.size, userHistoryInjection.size)
         } catch (e: Exception) {
             logger.warn("Failed to load from store", e)
         }
@@ -86,6 +90,11 @@ class SessionPersistence(
                 })
                 put(USER_THINKING_KEY, buildJsonObject {
                     userThinking.forEach { (userId, enabled) ->
+                        put(userId.toString(), JsonPrimitive(enabled))
+                    }
+                })
+                put(USER_HISTORY_INJECTION_KEY, buildJsonObject {
+                    userHistoryInjection.forEach { (userId, enabled) ->
                         put(userId.toString(), JsonPrimitive(enabled))
                     }
                 })
@@ -138,6 +147,10 @@ class SessionPersistence(
 
     private fun loadUserThinking(element: JsonElement) {
         loadMap(element, "user_thinking", { it.jsonPrimitive.content.toBoolean() }, userThinking)
+    }
+
+    private fun loadUserHistoryInjection(element: JsonElement) {
+        loadMap(element, "user_history_injection", { it.jsonPrimitive.content.toBoolean() }, userHistoryInjection)
     }
 
     private fun loadGlobalConfig(element: JsonElement) {

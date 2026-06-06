@@ -19,6 +19,7 @@ import java.util.concurrent.CopyOnWriteArrayList
  * - 主模型：每用户隔离，用户可自行设置
  * - 工作区：每用户隔离，用户可自行选择
  * - Thinking：每用户隔离，用户可自行开关
+ * - 消息历史注入：每用户隔离，用户可自行开关
  * - 备选/压缩模型：全局共享，操作员管理
  *
  * @property core CoreAPI 实例
@@ -44,6 +45,9 @@ class SessionManager(
     /** userId → 是否启用 thinking（每用户隔离） */
     private val userThinking = ConcurrentHashMap<Long, Boolean>()
 
+    /** userId → 是否注入消息历史（每用户隔离，默认 true） */
+    private val userHistoryInjection = ConcurrentHashMap<Long, Boolean>()
+
     /** 全局备选模型列表（操作员管理），线程安全 */
     private val globalFallbackModels = CopyOnWriteArrayList<UUID>()
 
@@ -61,6 +65,7 @@ class SessionManager(
         userPrimaryModels = userPrimaryModels,
         userSelectedWorkspaces = userSelectedWorkspaces,
         userThinking = userThinking,
+        userHistoryInjection = userHistoryInjection,
         globalFallbackModels = globalFallbackModels,
         globalSummarizeModel = { globalSummarizeModel }
     )
@@ -166,6 +171,28 @@ class SessionManager(
         userThinking[userId] = enabled
         scheduleSave()
         logger.info("User {} thinking set to {}", userId, enabled)
+    }
+
+    // ==================== 用户消息历史注入设置（每用户隔离） ====================
+
+    /**
+     * 获取用户的消息历史注入设置
+     *
+     * @param userId QQ 号
+     * @return 是否注入消息历史，未设置返回 true（默认开启）
+     */
+    fun getUserHistoryInjection(userId: Long): Boolean = userHistoryInjection[userId] ?: true
+
+    /**
+     * 设置用户的消息历史注入开关
+     *
+     * @param userId QQ 号
+     * @param enabled 是否启用
+     */
+    fun setUserHistoryInjection(userId: Long, enabled: Boolean) {
+        userHistoryInjection[userId] = enabled
+        scheduleSave()
+        logger.info("User {} history injection set to {}", userId, enabled)
     }
 
     // ==================== 全局模型配置（操作员管理） ====================

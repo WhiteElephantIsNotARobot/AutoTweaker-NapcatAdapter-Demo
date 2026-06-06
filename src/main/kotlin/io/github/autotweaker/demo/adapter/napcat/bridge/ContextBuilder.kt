@@ -10,20 +10,25 @@ import org.slf4j.LoggerFactory
  *
  * 负责为 LLM 构建带上下文的消息，包括：
  * - 注入会话所在的群/私聊信息
- * - 注入最近的群消息历史
+ * - 注入最近的群消息历史（可通过设置关闭）
  * - 处理合并转发消息
  * - 注入环境信息
  *
  * @property napCat NapCat API 实例，用于获取群名、成员列表、消息历史等
+ * @property sessionManager 会话管理器，用于获取用户历史注入设置
  */
-class ContextBuilder(private val napCat: NapCatApi) {
+class ContextBuilder(
+    private val napCat: NapCatApi,
+    private val sessionManager: SessionManager
+) {
 
     private val logger = LoggerFactory.getLogger(ContextBuilder::class.java)
 
     /**
      * 构建带上下文的消息
      *
-     * 在消息开头注入会话所在的群/私聊信息，以及最近的群消息历史和环境信息
+     * 在消息开头注入会话所在的群/私聊信息，以及最近的群消息历史和环境信息。
+     * 消息历史注入可通过用户设置关闭。
      */
     suspend fun buildMessageWithContext(groupId: Long?, userId: Long, text: String): String {
         return try {
@@ -53,79 +58,85 @@ class ContextBuilder(private val napCat: NapCatApi) {
             // 构建上下文
             contextBuilder.appendLine("<context>")
 
-            // 获取消息历史
-            val messages = try {
-                if (groupId != null) {
-                    napCat.getGroupMsgHistory(groupId, count = 20)
-                } else {
-                    napCat.getPrivateMsgHistory(userId, count = 20)
-                }
-            } catch (e: Exception) {
-                logger.warn("Failed to load message history", e)
-                emptyList()
-            }
-
-            // 获取群成员列表用于获取昵称（仅群聊）
-            val members = if (groupId != null) {
-                try {
-                    napCat.getGroupMemberList(groupId)
+            // 检查用户是否启用了消息历史注入
+            val historyEnabled = sessionManager.getUserHistoryInjection(userId)
+            if (historyEnabled) {
+                // 获取消息历史
+                val messages = try {
+                    if (groupId != null) {
+                        napCat.getGroupMsgHistory(groupId, count = 20)
+                    } else {
+                        napCat.getPrivateMsgHistory(userId, count = 20)
+                    }
                 } catch (e: Exception) {
+                    logger.warn("Failed to load message history", e)
                     emptyList()
                 }
-            } else {
-                emptyList()
-            }
 
-            // 收集合并转发消息
-            val forwardMessages = mutableMapOf<String, List<ForwardMessage>>()
-
-            // 构建消息历史
-            messages.forEach { msg ->
-                val nickname = escapeXml(if (groupId != null) {
-                    members.find { it.userId == msg.userId }?.let {
-                        it.card.ifEmpty { it.nickname }
-                    } ?: msg.sender.nickname.ifEmpty { msg.sender.userId.toString() }
-                } else {
-                    msg.sender.nickname.ifEmpty { msg.sender.userId.toString() }
-                })
-                val time = formatTime(msg.time)
-
-                // 检测合并转发消息
-                val forwardId = extractForwardId(msg.rawMessage)
-                if (forwardId != null) {
+                // 获取群成员列表用于获取昵称（仅群聊）
+                val members = if (groupId != null) {
                     try {
-                        val forwardContent = napCat.getForwardMsg(forwardId)
-                        forwardMessages[forwardId] = forwardContent
-                        contextBuilder.appendLine("[$time] $nickname: [合并转发消息 id=$forwardId]")
+                        napCat.getGroupMemberList(groupId)
                     } catch (e: Exception) {
-                        logger.warn("Failed to get forward message {}: {}", forwardId, e.message)
+                        emptyList()
+                    }
+                } else {
+                    emptyList()
+                }
+
+                // 收集合并转发消息
+                val forwardMessages = mutableMapOf<String, List<ForwardMessage>>()
+
+                // 构建消息历史
+                messages.forEach { msg ->
+                    val nickname = escapeXml(if (groupId != null) {
+                        members.find { it.userId == msg.userId }?.let {
+                            it.card.ifEmpty { it.nickname }
+                        } ?: msg.sender.nickname.ifEmpty { msg.sender.userId.toString() }
+                    } else {
+                        msg.sender.nickname.ifEmpty { msg.sender.userId.toString() }
+                    })
+                    val time = formatTime(msg.time)
+
+                    // 检测合并转发消息
+                    val forwardId = extractForwardId(msg.rawMessage)
+                    if (forwardId != null) {
+                        try {
+                            val forwardContent = napCat.getForwardMsg(forwardId)
+                            forwardMessages[forwardId] = forwardContent
+                            contextBuilder.appendLine("[$time] $nickname: [合并转发消息 id=$forwardId]")
+                        } catch (e: Exception) {
+                            logger.warn("Failed to get forward message {}: {}", forwardId, e.message)
+                            contextBuilder.appendLine("[$time] $nickname: ${escapeXml(msg.rawMessage)}")
+                        }
+                    } else {
                         contextBuilder.appendLine("[$time] $nickname: ${escapeXml(msg.rawMessage)}")
                     }
-                } else {
-                    contextBuilder.appendLine("[$time] $nickname: ${escapeXml(msg.rawMessage)}")
                 }
-            }
 
-            // 添加合并转发消息内容
-            if (forwardMessages.isNotEmpty()) {
-                contextBuilder.appendLine()
-                contextBuilder.appendLine("<forward>")
-                forwardMessages.forEach { (id, forwardMsgs) ->
-                    contextBuilder.appendLine("  <forward id=\"$id\">")
-                    forwardMsgs.forEach { msg ->
-                        val nickname = escapeXml(if (groupId != null) {
-                            members.find { it.userId == msg.sender.userId }?.let {
-                                it.card.ifEmpty { it.nickname }
-                            } ?: msg.sender.nickname.ifEmpty { msg.sender.userId.toString() }
-                        } else {
-                            msg.sender.nickname.ifEmpty { msg.sender.userId.toString() }
-                        })
-                        val time = formatTime(msg.time)
-                        contextBuilder.appendLine("    [$time] $nickname: ${escapeXml(msg.rawMessage)}")
+                // 添加合并转发消息内容
+                if (forwardMessages.isNotEmpty()) {
+                    contextBuilder.appendLine()
+                    contextBuilder.appendLine("<forward>")
+                    forwardMessages.forEach { (id, forwardMsgs) ->
+                        contextBuilder.appendLine("  <forward id=\"$id\">")
+                        forwardMsgs.forEach { msg ->
+                            val nickname = escapeXml(if (groupId != null) {
+                                members.find { it.userId == msg.sender.userId }?.let {
+                                    it.card.ifEmpty { it.nickname }
+                                } ?: msg.sender.nickname.ifEmpty { msg.sender.userId.toString() }
+                            } else {
+                                msg.sender.nickname.ifEmpty { msg.sender.userId.toString() }
+                            })
+                            val time = formatTime(msg.time)
+                            contextBuilder.appendLine("    [$time] $nickname: ${escapeXml(msg.rawMessage)}")
+                        }
+                        contextBuilder.appendLine("  </forward>")
                     }
-                    contextBuilder.appendLine("  </forward>")
+                    contextBuilder.appendLine("</forward>")
                 }
-                contextBuilder.appendLine("</forward>")
+            } else {
+                logger.debug("History injection disabled for user {}", userId)
             }
 
             contextBuilder.appendLine("</context>")

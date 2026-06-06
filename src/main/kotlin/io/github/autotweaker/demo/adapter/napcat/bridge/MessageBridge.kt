@@ -44,7 +44,7 @@ class MessageBridge(
     private val logger = LoggerFactory.getLogger(MessageBridge::class.java)
     private val trace = core.trace(this::class)
 
-    private val contextBuilder = ContextBuilder(napCat)
+    private val contextBuilder = ContextBuilder(napCat, sessionManager)
 
     /** 会话 → 消息发送上下文的映射，用于回复路由 */
     private val sessionContexts = ConcurrentHashMap<UUID, MessageContext>()
