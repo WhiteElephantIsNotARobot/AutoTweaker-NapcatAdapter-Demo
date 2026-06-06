@@ -49,6 +49,29 @@ class SessionListener(
     private val pendingToolCalls = ConcurrentHashMap<UUID, List<String>>()
 
     /**
+     * 拒绝指定会话的所有待审批工具调用
+     *
+     * @param sessionId 会话 ID
+     * @param reason 拒绝原因（用户发送的消息内容）
+     * @return true 表示有待审批调用并已拒绝，false 表示无待审批
+     */
+    suspend fun rejectPendingCalls(sessionId: UUID, reason: String): Boolean {
+        val callIds = pendingToolCalls[sessionId] ?: return false
+        if (callIds.isEmpty()) return false
+        return try {
+            val approvals = callIds.map { ToolApprove(callId = it, approved = false, reason = reason) }
+            core.session.approveToolCall(sessionId, approvals)
+            trace.add("session_reject_pending", "session=$sessionId, count=${callIds.size}")
+            pendingToolCalls.remove(sessionId)
+            true
+        } catch (e: Exception) {
+            logger.warn("拒绝待审批工具调用失败: session={}", sessionId, e)
+            trace.add("e", e.toString())
+            false
+        }
+    }
+
+    /**
      * 清除指定会话的所有待审批工具调用记录
      *
      * @param sessionId 会话 ID

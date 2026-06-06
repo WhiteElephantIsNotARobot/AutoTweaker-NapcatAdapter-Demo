@@ -194,8 +194,10 @@ class MessageBridge(
         // 确保监听器已启动
         sessionListener.ensureListeners(handle.id)
 
-        // 新消息开始新轮次，清除旧的待审批记录
-        sessionListener.clearPendingCalls(handle.id)
+        // 有待审批工具调用时，用消息内容拒绝并跳过发送
+        if (sessionListener.rejectPendingCalls(handle.id, text)) {
+            return
+        }
 
         try {
             // 检测消息链中的合并转发
