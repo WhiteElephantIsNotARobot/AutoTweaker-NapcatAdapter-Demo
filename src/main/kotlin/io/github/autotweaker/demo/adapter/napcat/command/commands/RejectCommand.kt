@@ -60,6 +60,7 @@ class RejectCommand : Command {
         return try {
             val approvals = listOf(ToolApprove(callId = callId, reason = reason, approved = false))
             context.core.session.approveToolCall(handle.id, approvals)
+            context.messageBridge.removePendingCall(handle.id, callId)
             trace.add("session_approve", "session=${handle.id}, approvals=$approvals")
             "已拒绝工具调用: $callId"
         } catch (e: Exception) {
