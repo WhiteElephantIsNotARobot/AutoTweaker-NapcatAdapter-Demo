@@ -180,6 +180,7 @@ interface TraceAPI {
     suspend fun origins(): List<String>
     suspend fun namespaces(origin: String): List<String>
     suspend fun entries(origin: String, namespace: String, range: UIntRange): List<Instant>
+    suspend fun count(origin: String, namespace: String): Int
     suspend fun get(origin: String, namespace: String, timestamp: Instant): String?
     suspend fun delete(origin: String, namespace: String, timestamp: Instant)
 }
@@ -228,6 +229,23 @@ suspend fun entries(origin: String, namespace: String, range: UIntRange): List<I
 | `range` | `UIntRange` | 索引范围 |
 
 **返回值：** `List<Instant>` 时间戳列表
+
+### count
+
+```kotlin
+suspend fun count(origin: String, namespace: String): Int
+```
+
+获取指定来源和命名空间的追踪条目总数。
+
+**参数：**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `origin` | `String` | 追踪来源 |
+| `namespace` | `String` | 命名空间 |
+
+**返回值：** `Int` 条目总数
 
 ### get
 

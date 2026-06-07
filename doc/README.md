@@ -1,6 +1,6 @@
 # AutoTweaker API 文档
 
-> 版本: v0.1.0-alpha.24
+> 版本: v0.1.0-alpha.26
 > 源码: [github.com/AutoTweaker/core](https://github.com/AutoTweaker/core/tree/main/api/src/main/kotlin/io/github/autotweaker/api)
 
 ## 概述
@@ -140,26 +140,22 @@ object MySettings {
 ### 4. 创建工具
 
 ```kotlin
-class MyTool : Tool {
-    override val meta = Tool.Meta(
-        name = "my-tool",
-        description = "我的工具",
-        functions = listOf(
-            Tool.Function(
-                name = "execute",
-                description = "执行操作",
-                parameters = mapOf(
-                    "input" to Tool.Function.Property(
-                        description = "输入参数",
-                        required = true,
-                        valueType = Tool.Function.Property.ValueType.StringValue()
-                    )
-                )
-            )
-        )
+@Serializable
+data class MyToolArgs(
+    val input: String,
+)
+
+@AutoService(Tool::class)
+class MyTool : Tool<MyToolArgs> {
+    override val argsSerializer = MyToolArgs.serializer()
+    override val name = "my-tool"
+    override val description = "我的工具"
+
+    override suspend fun describe() = mapOf(
+        MyToolArgs::input to "输入参数"
     )
 
-    override suspend fun execute(input: Tool.ToolInput): Tool.ToolOutput {
+    override suspend fun execute(input: Tool.ToolInput<MyToolArgs>): Tool.ToolOutput {
         // 通过适配器访问设置服务
         val value = MyAdapter.core.config.settingService.get(MySettings.MaxRetries())
         return Tool.ToolOutput("执行成功", true)

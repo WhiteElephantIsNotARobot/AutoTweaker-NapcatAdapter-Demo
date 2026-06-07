@@ -5,32 +5,66 @@ Agent 工具接口，用于扩展 Agent 的能力。
 ## 定义
 
 ```kotlin
-interface Tool {
-    val meta: Meta
-    suspend fun execute(input: ToolInput): ToolOutput
+interface Tool<Args : Any> {
+    val argsSerializer: KSerializer<Args>
+    val name: String
+    val description: String
 
-    data class Meta(...)
-    data class Function(...)
-    class ToolInput(...)
-    data class RuntimeOutput(...)
-    data class ToolOutput(...)
+    suspend fun describe(): Map<KProperty1<*, *>, String> = emptyMap()
+    suspend fun describeFunctions(): Map<KClass<*>, String> = emptyMap()
+
+    suspend fun execute(input: ToolInput<Args>): ToolOutput
 }
 ```
 
-## 属性与方法
+## 属性
 
-### meta
+### argsSerializer
 
 ```kotlin
-val meta: Meta
+val argsSerializer: KSerializer<Args>
 ```
 
-工具元数据，包含名称、描述、函数列表。
+参数序列化器。使用 `@Serializable` 注解的 data class 的 `serializer()` 即可。
+
+### name
+
+```kotlin
+val name: String
+```
+
+工具名称（唯一标识）。
+
+### description
+
+```kotlin
+val description: String
+```
+
+工具描述。
+
+## 方法
+
+### describe
+
+```kotlin
+suspend fun describe(): Map<KProperty1<*, *>, String> = emptyMap()
+```
+
+为参数属性添加描述。返回属性引用到描述字符串的映射。
+
+### describeFunctions
+
+```kotlin
+suspend fun describeFunctions(): Map<KClass<*>, String> = emptyMap()
+```
+
+声明多个函数。返回参数类到函数描述的映射。用于一个工具提供多个函数的场景。
 
 ### execute
 
 ```kotlin
-suspend fun execute(input: ToolInput): ToolOutput
+suspend fun execute(input: ToolInput<Args>): ToolOutput
 ```
 
 执行工具函数。
@@ -39,88 +73,23 @@ suspend fun execute(input: ToolInput): ToolOutput
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
-| `input` | `ToolInput` | 工具执行输入 |
+| `input` | `ToolInput<Args>` | 工具执行输入 |
 
 **返回值：** `ToolOutput` 执行结果
-
-## Meta
-
-```kotlin
-data class Meta(
-    val name: String,
-    val description: String,
-    val functions: List<Function>,
-)
-```
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `name` | `String` | 工具名称（唯一标识） |
-| `description` | `String` | 工具描述 |
-| `functions` | `List<Function>` | 函数列表 |
-
-## Function
-
-```kotlin
-data class Function(
-    val name: String,
-    val description: String,
-    val parameters: Map<String, Property>,
-)
-```
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `name` | `String` | 函数名称 |
-| `description` | `String` | 函数描述 |
-| `parameters` | `Map<String, Property>` | 参数定义 |
-
-## Function.Property
-
-```kotlin
-data class Property(
-    val description: String,
-    val required: Boolean,
-    val valueType: ValueType
-)
-```
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `description` | `String` | 参数描述 |
-| `required` | `Boolean` | 是否必填 |
-| `valueType` | `ValueType` | 值类型 |
-
-## ValueType
-
-参数值类型（密封类）：
-
-| 类型 | 说明 |
-|------|------|
-| `StringValue(enum?)` | 字符串类型，可选枚举值 |
-| `NumberValue(enum?)` | 数字类型，可选枚举值 |
-| `IntegerValue(enum?)` | 整数类型，可选枚举值 |
-| `BooleanValue` | 布尔类型 |
-| `ArrayValue(items)` | 数组类型，指定元素类型 |
-| `ObjectValue(properties)` | 对象类型，指定属性类型 |
 
 ## ToolInput
 
 ```kotlin
-class ToolInput(
-    val functionName: String,
-    val arguments: JsonObject,
+class ToolInput<Args : Any>(
+    val args: Args,
     val outputChannel: Channel<RuntimeOutput>? = null,
 )
 ```
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `functionName` | `String` | 要调用的函数名 |
-| `arguments` | `JsonObject` | 函数参数 |
+| `args` | `Args` | 类型安全的参数对象 |
 | `outputChannel` | `Channel<RuntimeOutput>?` | 流式输出通道 |
-
-**注意：** `ToolInput` 不包含 `SettingService`。需要访问设置服务的工具应通过适配器的 `CoreAPI` 间接访问。
 
 ## RuntimeOutput
 
@@ -135,7 +104,7 @@ data class RuntimeOutput(val content: String)
 ```kotlin
 data class ToolOutput(
     val result: String,
-    val success: Boolean
+    val success: Boolean,
 )
 ```
 
@@ -149,10 +118,23 @@ data class ToolOutput(
 ### 使用 @AutoService（推荐）
 
 ```kotlin
+@Serializable
+data class MyToolArgs(val input: String)
+
 @AutoService(Tool::class)
-class MyTool : Tool {
-    override val meta = Tool.Meta(...)
-    override suspend fun execute(input: Tool.ToolInput): Tool.ToolOutput = ...
+class MyTool : Tool<MyToolArgs> {
+    override val argsSerializer = MyToolArgs.serializer()
+    override val name = "my-tool"
+    override val description = "我的工具"
+
+    override suspend fun describe() = mapOf(
+        MyToolArgs::input to "输入参数"
+    )
+
+    override suspend fun execute(input: Tool.ToolInput<MyToolArgs>): Tool.ToolOutput {
+        val value = input.args.input
+        return Tool.ToolOutput("结果", true)
+    }
 }
 ```
 
@@ -162,6 +144,53 @@ class MyTool : Tool {
 
 ```
 com.example.MyTool
+```
+
+## 多函数工具
+
+一个工具可以通过 `describeFunctions()` 提供多个函数。每个函数对应一个 `@Serializable` data class：
+
+```kotlin
+@Serializable
+data class SendMessageArgs(val userId: Long, val message: String)
+
+@Serializable
+data class GetMessageArgs(val messageId: Int)
+
+@Serializable
+data class EmptyArgs(val __noop: Unit = Unit) // 无参数函数的占位
+
+@AutoService(Tool::class)
+class QqTool : Tool<EmptyArgs> {
+    override val argsSerializer = EmptyArgs.serializer()
+    override val name = "qq"
+    override val description = "QQ 工具"
+
+    override suspend fun describeFunctions() = mapOf(
+        SendMessageArgs::class to "发送消息",
+        GetMessageArgs::class to "获取消息",
+    )
+
+    override suspend fun execute(input: Tool.ToolInput<EmptyArgs>): Tool.ToolOutput {
+        // 多函数模式下，Core 会根据 LLM 选择的函数传入对应的 Args 实例
+        // 但 execute 的签名仍需一个默认 Args 类型
+        // 实际实现中通常通过 outputChannel 或其他方式处理
+        return Tool.ToolOutput("ok", true)
+    }
+}
+```
+
+## 流式输出
+
+通过 `outputChannel` 发送运行时输出：
+
+```kotlin
+override suspend fun execute(input: Tool.ToolInput<MyToolArgs>): Tool.ToolOutput {
+    input.outputChannel?.send(Tool.RuntimeOutput("正在处理..."))
+    // 执行操作
+    input.outputChannel?.send(Tool.RuntimeOutput("完成"))
+    return Tool.ToolOutput("成功", true)
+}
 ```
 
 ## 工具激活机制
@@ -183,49 +212,29 @@ com.example.MyTool
 - 流式输出通过 `outputChannel` 发送
 - 工具执行超时（默认 600 秒）会取消
 
-## 示例
+## 完整示例
 
 ```kotlin
-@AutoService(Tool::class)
-class FileReadTool : Tool {
-    companion object {
-        // 通过适配器获取设置服务
-        private val settings get() = MyAdapter.core.config.settingService
-    }
+@Serializable
+data class FileReadArgs(
+    val path: String,
+    val encoding: String = "utf-8",
+)
 
-    override val meta = Tool.Meta(
-        name = "file-read",
-        description = "读取文件内容",
-        functions = listOf(
-            Tool.Function(
-                name = "read",
-                description = "读取指定文件",
-                parameters = mapOf(
-                    "path" to Tool.Function.Property(
-                        description = "文件路径",
-                        required = true,
-                        valueType = Tool.Function.Property.ValueType.StringValue()
-                    ),
-                    "encoding" to Tool.Function.Property(
-                        description = "文件编码",
-                        required = false,
-                        valueType = Tool.Function.Property.ValueType.StringValue(
-                            enum = listOf("utf-8", "ascii", "latin-1")
-                        )
-                    )
-                )
-            )
-        )
+@AutoService(Tool::class)
+class FileReadTool : Tool<FileReadArgs> {
+    override val argsSerializer = FileReadArgs.serializer()
+    override val name = "file-read"
+    override val description = "读取文件内容"
+
+    override suspend fun describe() = mapOf(
+        FileReadArgs::path to "文件路径",
+        FileReadArgs::encoding to "文件编码（默认 utf-8）"
     )
 
-    override suspend fun execute(input: Tool.ToolInput): Tool.ToolOutput {
-        val path = input.arguments["path"]?.jsonPrimitive?.content
-            ?: return Tool.ToolOutput("缺少 path 参数", false)
-        
-        val encoding = input.arguments["encoding"]?.jsonPrimitive?.content ?: "utf-8"
-        
+    override suspend fun execute(input: Tool.ToolInput<FileReadArgs>): Tool.ToolOutput {
         return try {
-            val content = java.io.File(path).readText(charset(encoding))
+            val content = java.io.File(input.args.path).readText(charset(input.args.encoding))
             Tool.ToolOutput(content, true)
         } catch (e: Exception) {
             Tool.ToolOutput("读取失败: ${e.message}", false)

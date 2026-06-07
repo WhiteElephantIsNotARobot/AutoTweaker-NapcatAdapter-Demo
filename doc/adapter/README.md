@@ -4,13 +4,29 @@
 
 ```kotlin
 interface Adapter {
+    val isRunning: Boolean
+
     suspend fun load(coreVersion: SemVer): AdapterInfo
     suspend fun start(core: CoreAPI)
     suspend fun stop()
 }
 ```
 
-## 方法
+## 属性与方法
+
+### isRunning
+
+```kotlin
+val isRunning: Boolean
+```
+
+适配器是否正在运行。适配器根据内部状态实现，例如：
+
+```kotlin
+override val isRunning: Boolean get() = server != null
+```
+
+### 方法
 
 | 方法 | 参数 | 返回值 | 说明 |
 |------|------|--------|------|
