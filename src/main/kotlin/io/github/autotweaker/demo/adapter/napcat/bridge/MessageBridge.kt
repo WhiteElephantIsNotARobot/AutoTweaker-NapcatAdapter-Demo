@@ -70,7 +70,6 @@ class MessageBridge(
         when (event) {
             is GroupMessageEvent -> handleGroupMessage(event)
             is PrivateMessageEvent -> handlePrivateMessage(event)
-            else -> logger.debug("Unhandled message event type")
         }
     }
 

@@ -47,7 +47,7 @@ class ContextBuilder(
                 contextBuilder.appendLine("会话类型：群聊")
                 contextBuilder.appendLine("群号：$groupId")
                 if (groupName != null) {
-                    contextBuilder.appendLine("群名：${escapeXml(groupName ?: "未知")}")
+                    contextBuilder.appendLine("群名：${escapeXml(groupName)}")
                 }
             } else {
                 // 私聊

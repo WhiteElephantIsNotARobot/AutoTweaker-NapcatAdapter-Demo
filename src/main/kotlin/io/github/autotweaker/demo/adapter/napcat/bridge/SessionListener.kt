@@ -194,7 +194,7 @@ class SessionListener(
                     sendToSession(sessionId, "LLM 错误: ${sessionOutput.content}")
                 }
                 is SessionOutput.Error -> {
-                    sendToSession(sessionId, "错误: ${sessionOutput.error.message ?: "未知错误"}")
+                    sendToSession(sessionId, "错误: ${sessionOutput.error.message}")
                 }
                 is SessionOutput.Compact -> {
                     when (sessionOutput.output.status) {
