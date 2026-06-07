@@ -31,10 +31,12 @@ import org.slf4j.LoggerFactory
 @AutoService(Adapter::class)
 class NapCatAdapter : Adapter {
 
+    override val isRunning: Boolean get() = initializationState == InitializationState.READY
+
     companion object {
         @Volatile private var _core: CoreAPI? = null
         @Volatile private var _napCatApi: NapCatApi? = null
-        @Volatile var initializationState: String = "NOT_STARTED"
+        @Volatile var initializationState: InitializationState = InitializationState.NOT_STARTED
             private set
 
         /** CoreAPI 实例，适配器启动后可用 */
@@ -60,7 +62,7 @@ class NapCatAdapter : Adapter {
     }
 
     override suspend fun start(core: CoreAPI) {
-        initializationState = "STARTING"
+        initializationState = InitializationState.STARTING
         _core = core
         logger.info("NapCat adapter starting...")
 
@@ -77,18 +79,18 @@ class NapCatAdapter : Adapter {
         }
 
         // 已解锁，直接初始化
-        initializationState = "INITIALIZING"
+        initializationState = InitializationState.INITIALIZING
         initializeComponents(core)
-        initializationState = "READY"
+        initializationState = InitializationState.READY
     }
 
     private suspend fun waitForUnlockAndInitialize(core: CoreAPI) {
         try {
             core.secret.isUnlocked.first { it }
             logger.info("Secret unlocked, initializing components...")
-            initializationState = "INITIALIZING"
+            initializationState = InitializationState.INITIALIZING
             initializeComponents(core)
-            initializationState = "READY"
+            initializationState = InitializationState.READY
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -165,7 +167,7 @@ class NapCatAdapter : Adapter {
     }
 
     override suspend fun stop() {
-        initializationState = "STOPPED"
+        initializationState = InitializationState.STOPPED
         logger.info("Stopping NapCat adapter...")
         // 取消所有协程（包括输出监听器）
         adapterScope?.cancel()
@@ -179,4 +181,12 @@ class NapCatAdapter : Adapter {
         adapterScope = null
         logger.info("NapCat adapter stopped")
     }
+}
+
+enum class InitializationState {
+    NOT_STARTED,
+    STARTING,
+    INITIALIZING,
+    READY,
+    STOPPED
 }
