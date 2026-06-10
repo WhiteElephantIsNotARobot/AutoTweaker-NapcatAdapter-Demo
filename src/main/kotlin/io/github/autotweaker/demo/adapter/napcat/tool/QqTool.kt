@@ -1,6 +1,7 @@
 package io.github.autotweaker.demo.adapter.napcat.tool
 
 import com.google.auto.service.AutoService
+import io.github.autotweaker.api.trace.TraceRecorder
 import io.github.autotweaker.api.tool.Tool
 import io.github.autotweaker.demo.adapter.napcat.NapCatAdapter
 import io.github.autotweaker.demo.adapter.napcat.api.NapCatApi
@@ -49,6 +50,7 @@ class QqTool : Tool<QqToolFunctions.Args> {
     override val description = "QQ 机器人操作工具，提供消息收发、群管理、好友查询等功能"
 
     private val logger = LoggerFactory.getLogger(this::class.java)
+    private val trace: TraceRecorder by lazy { NapCatAdapter.core.trace(this::class) }
 
     override suspend fun describe(): Map<KProperty1<*, *>, String> = mapOf(
         // 消息
@@ -133,6 +135,7 @@ class QqTool : Tool<QqToolFunctions.Args> {
         try {
             return NapCatAdapter.napCatApi
         } catch (e: Exception) {
+            trace.exception(e)
             val hasCore = try { NapCatAdapter.core; true } catch (_: Exception) { false }
             logger.error(
                 "Failed to resolve NapCatApi  toolCL={}  adapterCL={}  sameCL={}  hasCore={}",
@@ -189,6 +192,7 @@ class QqTool : Tool<QqToolFunctions.Args> {
             }
             Tool.ToolOutput(output, true)
         } catch (e: Exception) {
+            trace.exception(e)
             logger.error("Failed to execute tool  tool=qq", e)
             Tool.ToolOutput("执行失败，请稍后重试", false)
         }

@@ -1,5 +1,7 @@
 package io.github.autotweaker.demo.adapter.napcat.permission
 
+import io.github.autotweaker.api.trace.TraceRecorder
+import io.github.autotweaker.demo.adapter.napcat.NapCatAdapter
 import io.github.autotweaker.api.adapter.CoreAPI
 import io.github.autotweaker.demo.adapter.napcat.config.NapCatSettings
 import kotlinx.serialization.json.JsonPrimitive
@@ -26,6 +28,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 class PermissionManager(private val core: CoreAPI) {
 
     private val logger = LoggerFactory.getLogger(this::class.java)
+    private val trace: TraceRecorder by lazy { NapCatAdapter.core.trace(this::class) }
 
     private val store by lazy {
         core.config.jsonStore(PermissionManager::class)
@@ -218,6 +221,7 @@ class PermissionManager(private val core: CoreAPI) {
             val ids = arr.map { it.jsonPrimitive.content.toLong() }
             addTo(ids)
         } catch (e: Exception) {
+            trace.exception(e)
             logger.warn("Failed to load list  key={}", key, e)
         }
     }
@@ -233,6 +237,7 @@ class PermissionManager(private val core: CoreAPI) {
             val existing = try {
                 store.get()?.jsonObject
             } catch (e: Exception) {
+            trace.exception(e)
                 null
             }
 
@@ -248,6 +253,7 @@ class PermissionManager(private val core: CoreAPI) {
             }
             store.set(obj)
         } catch (e: Exception) {
+            trace.exception(e)
             logger.error("Failed to save list  key={}", key, e)
         }
       }

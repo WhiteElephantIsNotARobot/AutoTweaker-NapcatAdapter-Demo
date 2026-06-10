@@ -1,5 +1,6 @@
 package io.github.autotweaker.demo.adapter.napcat.ws
 
+import io.github.autotweaker.api.trace.catching
 import io.github.autotweaker.demo.adapter.napcat.NapCatAdapter
 import io.github.autotweaker.demo.adapter.napcat.model.event.*
 import io.ktor.client.*

@@ -2,6 +2,7 @@ package io.github.autotweaker.demo.adapter.napcat.command.commands
 
 import io.github.autotweaker.api.types.session.WorkspaceMeta
 import io.github.autotweaker.api.trace.TraceRecorder
+import io.github.autotweaker.demo.adapter.napcat.NapCatAdapter
 import io.github.autotweaker.demo.adapter.napcat.command.Command
 import io.github.autotweaker.demo.adapter.napcat.command.CommandContext
 import io.github.autotweaker.demo.adapter.napcat.permission.Role
@@ -139,6 +140,7 @@ class WorkspaceCommand : Command {
         val path = try {
             Paths.get(pathStr).toRealPath()
         } catch (e: Exception) {
+            trace.exception(e)
             return "无效路径: $pathStr"
         }
 
@@ -162,6 +164,7 @@ class WorkspaceCommand : Command {
             trace.add("workspace_create", meta.toString())
             "工作区已创建: ${workspace.meta.displayName}\n路径: ${workspace.meta.path}"
         } catch (e: Exception) {
+            trace.exception(e)
             "创建工作区失败: ${e.message}"
         }
     }
@@ -209,6 +212,7 @@ class WorkspaceCommand : Command {
             context.core.session.deleteWorkspace(workspace.meta.id)
             "已删除工作区: ${workspace.meta.displayName}"
         } catch (e: Exception) {
+            trace.exception(e)
             "删除工作区失败: ${e.message}"
         }
     }

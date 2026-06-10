@@ -1,5 +1,7 @@
 package io.github.autotweaker.demo.adapter.napcat.ws
 
+import io.github.autotweaker.api.trace.TraceRecorder
+import io.github.autotweaker.demo.adapter.napcat.NapCatAdapter
 import io.github.autotweaker.demo.adapter.napcat.api.NapCatApi
 import io.github.autotweaker.demo.adapter.napcat.model.data.*
 import io.github.autotweaker.demo.adapter.napcat.model.event.GroupMessageEvent
@@ -22,6 +24,7 @@ abstract class NapCatApiImpl(
 ) : NapCatApi {
 
     private val logger = LoggerFactory.getLogger(this::class.java)
+    private val trace: TraceRecorder by lazy { NapCatAdapter.core.trace(this::class) }
 
     /**
      * 发送 OneBot API 请求并获取原始 JSON 响应
@@ -196,6 +199,7 @@ abstract class NapCatApiImpl(
                     null
                 }
             } catch (e: Exception) {
+            trace.exception(e)
                 logger.debug("Failed to parse group message", e)
                 null
             }
@@ -228,6 +232,7 @@ abstract class NapCatApiImpl(
                     null
                 }
             } catch (e: Exception) {
+            trace.exception(e)
                 logger.debug("Failed to parse private message", e)
                 null
             }
@@ -267,6 +272,7 @@ abstract class NapCatApiImpl(
             try {
                 json.decodeFromJsonElement(ForwardMessage.serializer(), element)
             } catch (e: Exception) {
+            trace.exception(e)
                 logger.debug("Failed to parse forward message", e)
                 null
             }

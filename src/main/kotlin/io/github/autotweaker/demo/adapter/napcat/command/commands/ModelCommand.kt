@@ -3,6 +3,7 @@ package io.github.autotweaker.demo.adapter.napcat.command.commands
 import io.github.autotweaker.api.types.config.CoreConfig
 import io.github.autotweaker.api.types.llm.ModelData
 import io.github.autotweaker.api.trace.TraceRecorder
+import io.github.autotweaker.api.trace.catching
 import io.github.autotweaker.demo.adapter.napcat.command.Command
 import io.github.autotweaker.demo.adapter.napcat.command.CommandContext
 import io.github.autotweaker.demo.adapter.napcat.permission.Role

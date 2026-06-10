@@ -1,5 +1,7 @@
 package io.github.autotweaker.demo.adapter.napcat.bridge
 
+import io.github.autotweaker.api.trace.TraceRecorder
+import io.github.autotweaker.demo.adapter.napcat.NapCatAdapter
 import io.github.autotweaker.api.config.JsonStore
 import kotlinx.serialization.json.*
 import org.slf4j.LoggerFactory
@@ -34,6 +36,7 @@ class SessionPersistence(
 ) {
 
     private val logger = LoggerFactory.getLogger(this::class.java)
+    private val trace: TraceRecorder by lazy { NapCatAdapter.core.trace(this::class) }
 
     companion object {
         private const val SESSION_MAP_KEY = "session_map"
@@ -62,6 +65,7 @@ class SessionPersistence(
             logger.debug("Persistence loaded  sessions={}  userModels={}  userWorkspaces={}  userThinking={}  userHistoryInjection={}",
                 activeSessions.size, userPrimaryModels.size, userSelectedWorkspaces.size, userThinking.size, userHistoryInjection.size)
         } catch (e: Exception) {
+            trace.exception(e)
             logger.warn("Failed to load from store", e)
         }
     }
@@ -109,6 +113,7 @@ class SessionPersistence(
             }
             store.set(obj)
         } catch (e: Exception) {
+            trace.exception(e)
             logger.error("Failed to save to store", e)
         }
       }
@@ -125,10 +130,12 @@ class SessionPersistence(
                 try {
                     target[k.toLong()] = valueParser(v)
                 } catch (e: Exception) {
+            trace.exception(e)
                     logger.warn("Failed to load entry  key={}  source={}", k, key, e)
                 }
             }
         } catch (e: Exception) {
+            trace.exception(e)
             logger.warn("Failed to load  key={}", key, e)
         }
     }
@@ -160,10 +167,12 @@ class SessionPersistence(
                 try {
                     globalFallbackModels.add(UUID.fromString(it.jsonPrimitive.content))
                 } catch (e: Exception) {
+            trace.exception(e)
                     logger.warn("Failed to parse fallback model  value={}", it)
                 }
             }
         } catch (e: Exception) {
+            trace.exception(e)
             logger.warn("Failed to load global config", e)
         }
     }
@@ -179,6 +188,7 @@ class SessionPersistence(
                 UUID.fromString(it.jsonPrimitive.content)
             }
         } catch (e: Exception) {
+            trace.exception(e)
             logger.warn("Failed to load summarize model", e)
             null
         }

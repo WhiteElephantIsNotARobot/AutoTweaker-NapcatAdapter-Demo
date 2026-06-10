@@ -1,6 +1,8 @@
 package io.github.autotweaker.demo.adapter.napcat.bridge
 
 import io.github.autotweaker.api.adapter.CoreAPI
+import io.github.autotweaker.api.trace.TraceRecorder
+import io.github.autotweaker.api.trace.catching
 import io.github.autotweaker.api.types.agent.CompactOutput
 import io.github.autotweaker.api.types.agent.ToolApprove
 import io.github.autotweaker.api.types.session.SessionContext

@@ -1,6 +1,8 @@
 package io.github.autotweaker.demo.adapter.napcat.bridge
 
 import io.github.autotweaker.api.adapter.CoreAPI
+import io.github.autotweaker.api.trace.TraceRecorder
+import io.github.autotweaker.api.trace.catching
 import io.github.autotweaker.api.types.session.SessionConfig
 import io.github.autotweaker.api.types.session.SessionHandle
 import io.github.autotweaker.demo.adapter.napcat.command.commands.WorkspaceCommand
@@ -254,15 +256,16 @@ class SessionManager(
         // 获取用户选择的工作区
         val selectedWorkspaceId = userSelectedWorkspaces[userId]
 
-        val sessionId = if (permissionManager.hasNonContainerPermission(userId)) {
+        val sessionId: UUID = if (permissionManager.hasNonContainerPermission(userId)) {
             // 有非容器权限：优先使用用户选择的工作区，否则用默认工作区
             if (selectedWorkspaceId != null) {
                 val workspace = core.session.listWorkspaces()
                     .find { it.meta.id == selectedWorkspaceId }
                 if (workspace != null) {
-                    val sessionId = trace.catching {
+                    try {
                         core.session.create(workspace.meta.id, config)
-                    }.getOrElse { e ->
+                    } catch (e: Exception) {
+                        trace.exception(e)
                         logger.warn("Failed to create session  workspaceId={}  falling back to default", selectedWorkspaceId, e)
                         core.session.create(config)
                     }

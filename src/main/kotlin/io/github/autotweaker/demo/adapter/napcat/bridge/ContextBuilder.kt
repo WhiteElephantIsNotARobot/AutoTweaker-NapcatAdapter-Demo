@@ -5,6 +5,7 @@ import io.github.autotweaker.demo.adapter.napcat.api.NapCatApi
 import io.github.autotweaker.demo.adapter.napcat.model.data.ForwardMessage
 import io.github.autotweaker.demo.adapter.napcat.model.message.MessageSegment
 import io.github.autotweaker.api.trace.TraceRecorder
+import io.github.autotweaker.api.trace.catching
 import org.slf4j.LoggerFactory
 
 /**

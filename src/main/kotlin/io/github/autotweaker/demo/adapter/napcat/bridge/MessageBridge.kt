@@ -1,6 +1,8 @@
 package io.github.autotweaker.demo.adapter.napcat.bridge
 
 import io.github.autotweaker.api.adapter.CoreAPI
+import io.github.autotweaker.api.trace.TraceRecorder
+import io.github.autotweaker.api.trace.catching
 import io.github.autotweaker.demo.adapter.napcat.api.NapCatApi
 import io.github.autotweaker.demo.adapter.napcat.command.CommandContext
 import io.github.autotweaker.demo.adapter.napcat.command.CommandRegistry
@@ -175,11 +177,12 @@ class MessageBridge(
 
         // 无活跃会话，自动创建（清理旧会话上下文）
         if (handle == null) {
-            trace.catching {
+            try {
                 sessionManager.getActiveSession(userId)?.let { sessionContexts.remove(it) }
                 handle = sessionManager.autoCreateSession(userId)
                 sendReply(groupId, userId, "已自动创建并进入会话")
-            }.onFailure { e ->
+            } catch (e: Exception) {
+                trace.exception(e)
                 logger.error("Failed to auto-create session  userId={}", userId, e)
                 sendReply(groupId, userId, "无法自动创建会话，请稍后重试")
                 return
