@@ -125,9 +125,9 @@ class ModelCommand : Command {
         }
 
         // 获取提供商元数据
-        val providerMeta = try {
+        val providerMeta = trace.catching {
             context.core.config.getProviderMeta(provider.type)
-        } catch (e: Exception) {
+        }.getOrElse { e ->
             return "获取提供商元数据失败: ${e.message}"
         }
 
@@ -143,7 +143,7 @@ class ModelCommand : Command {
             }
 
         // 创建模型
-        return try {
+        return trace.catching {
             val model = CoreConfig.ProviderConfig.Model(
                 data = ModelData(
                     id = UUID.randomUUID(),
@@ -155,7 +155,7 @@ class ModelCommand : Command {
             context.core.config.addModel(model)
             trace.add("model_add", model.toString())
             "模型已创建: $displayName\n提供商: $providerName\n模型ID: $modelId"
-        } catch (e: Exception) {
+        }.getOrElse { e ->
             "创建模型失败: ${e.message}"
         }
     }
@@ -183,10 +183,10 @@ class ModelCommand : Command {
 
         if (model == null) return "未找到模型: $input"
 
-        return try {
+        return trace.catching {
             context.core.config.removeModel(model.data.id)
             "已删除模型: ${model.data.displayName}"
-        } catch (e: Exception) {
+        }.getOrElse { e ->
             "删除模型失败: ${e.message}"
         }
     }
@@ -203,10 +203,10 @@ class ModelCommand : Command {
         val handle = context.sessionManager.getActiveSessionHandle(context.userId)
         if (handle != null) {
             val config = handle.data.value.config
-            try {
+            trace.catching {
                 context.core.session.updateConfig(handle.id, config.copy(model = modelId))
                 trace.add("session_config_update", "session=${handle.id}, config=${config.copy(model = modelId)}")
-            } catch (e: Exception) {
+            }.onFailure { e ->
                 return "我的主模型已设置为: ${getModelDisplayName(context, modelId)}，但当前会话更新失败: ${e.message}"
             }
             return "我的主模型已设置为: ${getModelDisplayName(context, modelId)}，当前会话已生效"
