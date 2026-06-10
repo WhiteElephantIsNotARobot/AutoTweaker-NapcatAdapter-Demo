@@ -72,7 +72,7 @@ class PermissionManager(private val core: CoreAPI) {
             cachedOperators.add(userId)
         }
         saveOperators()
-        logger.info("Added operator: {}", userId)
+        logger.info("Operator added  userId={}", userId)
         return true
     }
 
@@ -80,7 +80,7 @@ class PermissionManager(private val core: CoreAPI) {
         ensureOperatorsLoaded()
         if (!cachedOperators.remove(userId)) return false
         saveOperators()
-        logger.info("Removed operator: {}", userId)
+        logger.info("Operator removed  userId={}", userId)
         return true
     }
 
@@ -98,7 +98,7 @@ class PermissionManager(private val core: CoreAPI) {
             cachedUsers.add(userId)
         }
         saveUsers()
-        logger.info("Added user: {}", userId)
+        logger.info("User added  userId={}", userId)
         return true
     }
 
@@ -106,7 +106,7 @@ class PermissionManager(private val core: CoreAPI) {
         ensureUsersLoaded()
         if (!cachedUsers.remove(userId)) return false
         saveUsers()
-        logger.info("Removed user: {}", userId)
+        logger.info("User removed  userId={}", userId)
         return true
     }
 
@@ -142,7 +142,7 @@ class PermissionManager(private val core: CoreAPI) {
         if (userId in userNonContainerPermissions) return false
         userNonContainerPermissions.add(userId)
         saveNonContainerPermissions()
-        logger.info("Granted non-container permission to user {}", userId)
+        logger.info("Non-container permission granted  userId={}", userId)
         return true
     }
 
@@ -155,7 +155,7 @@ class PermissionManager(private val core: CoreAPI) {
     fun revokeNonContainerPermission(userId: Long): Boolean {
         if (!userNonContainerPermissions.remove(userId)) return false
         saveNonContainerPermissions()
-        logger.info("Revoked non-container permission from user {}", userId)
+        logger.info("Non-container permission revoked  userId={}", userId)
         return true
     }
 
@@ -218,7 +218,7 @@ class PermissionManager(private val core: CoreAPI) {
             val ids = arr.map { it.jsonPrimitive.content.toLong() }
             addTo(ids)
         } catch (e: Exception) {
-            logger.warn("Failed to load list: {}", key, e)
+            logger.warn("Failed to load list  key={}", key, e)
         }
     }
 
@@ -248,7 +248,7 @@ class PermissionManager(private val core: CoreAPI) {
             }
             store.set(obj)
         } catch (e: Exception) {
-            logger.error("Failed to save list: {}", key, e)
+            logger.error("Failed to save list  key={}", key, e)
         }
       }
     }

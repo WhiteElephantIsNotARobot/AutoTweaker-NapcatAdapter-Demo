@@ -41,7 +41,7 @@ class ContextBuilder(
                 val groupName = try {
                     napCat.getGroupList().find { it.groupId == groupId }?.groupName?.let { escapeXml(it) }
                 } catch (e: Exception) {
-                    logger.warn("Failed to get group list for group name: {}", e.message)
+                    logger.warn("Failed to get group list  groupId={}", groupId, e)
                     null
                 }
                 contextBuilder.appendLine("会话类型：群聊")
@@ -106,7 +106,7 @@ class ContextBuilder(
                             forwardMessages[forwardId] = forwardContent
                             contextBuilder.appendLine("[$time] $nickname: [合并转发消息 id=$forwardId]")
                         } catch (e: Exception) {
-                            logger.warn("Failed to get forward message {}: {}", forwardId, e.message)
+                            logger.warn("Failed to get forward message  forwardId={}", forwardId, e)
                             contextBuilder.appendLine("[$time] $nickname: ${escapeXml(msg.rawMessage)}")
                         }
                     } else {
@@ -136,7 +136,7 @@ class ContextBuilder(
                     contextBuilder.appendLine("</forward>")
                 }
             } else {
-                logger.debug("History injection disabled for user {}", userId)
+                logger.debug("History injection disabled  userId={}", userId)
             }
 
             contextBuilder.appendLine("</context>")
@@ -144,7 +144,7 @@ class ContextBuilder(
             contextBuilder.append(text)
 
             val result = contextBuilder.toString()
-            logger.debug("Built message with context for user {} group {}, length={}", userId, groupId, result.length)
+            logger.debug("Message context built  userId={}  groupId={}  length={}", userId, groupId, result.length)
             result
         } catch (e: Exception) {
             logger.error("Failed to build message context", e)

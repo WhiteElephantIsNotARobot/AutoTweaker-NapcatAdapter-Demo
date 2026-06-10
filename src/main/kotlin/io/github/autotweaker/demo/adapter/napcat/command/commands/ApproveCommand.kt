@@ -53,7 +53,7 @@ class ApproveCommand : Command {
         val callId = try {
             context.messageBridge.getPendingCallId(handle.id, index)
         } catch (e: Exception) {
-            logger.warn("Failed to get pending call id", e)
+            logger.warn("Failed to get pending call id  sessionId={}", handle.id, e)
             null
         } ?: return "无效的序号: $index"
 
@@ -64,7 +64,7 @@ class ApproveCommand : Command {
             trace.add("session_approve", "session=${handle.id}, approvals=$approvals")
             "已审批工具调用: $callId"
         } catch (e: Exception) {
-            logger.error("Approve failed", e)
+            logger.error("Failed to approve tool call  sessionId={}  callId={}", handle.id, callId, e)
             trace.add("e", e.stackTraceToString())
             "审批失败，请稍后重试"
         }

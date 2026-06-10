@@ -135,8 +135,8 @@ class QqTool : Tool<QqToolFunctions.Args> {
         } catch (e: Exception) {
             val hasCore = try { NapCatAdapter.core; true } catch (_: Exception) { false }
             logger.error(
-                "NapCatApi 不可用: {}, Tool CL={}, Adapter CL={}, same={}, core={}",
-                e.message, toolCl, adapterCl, sameCl, hasCore
+                "Failed to resolve NapCatApi  toolCL={}  adapterCL={}  sameCL={}  hasCore={}",
+                toolCl, adapterCl, sameCl, hasCore, e
             )
             throw IllegalStateException(
                 "NapCatApi 服务不可用，请检查连接状态"
@@ -189,7 +189,7 @@ class QqTool : Tool<QqToolFunctions.Args> {
             }
             Tool.ToolOutput(output, true)
         } catch (e: Exception) {
-            logger.error("Tool execution failed", e)
+            logger.error("Failed to execute tool  tool=qq", e)
             Tool.ToolOutput("执行失败，请稍后重试", false)
         }
     }

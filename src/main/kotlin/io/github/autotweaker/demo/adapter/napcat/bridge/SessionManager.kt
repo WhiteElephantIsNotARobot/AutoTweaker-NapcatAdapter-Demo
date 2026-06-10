@@ -94,7 +94,7 @@ class SessionManager(
         return try {
             core.session.getHandle(sessionId)
         } catch (e: Exception) {
-            logger.warn("Failed to get handle for session {}", sessionId, e)
+            logger.warn("Failed to get session handle  sessionId={}", sessionId, e)
             trace.add("e", e.stackTraceToString())
             null
         }
@@ -126,7 +126,7 @@ class SessionManager(
     fun setUserPrimaryModel(userId: Long, modelId: UUID) {
         userPrimaryModels[userId] = modelId
         scheduleSave()
-        logger.info("User {} primary model set to {}", userId, modelId)
+        logger.info("User primary model set  userId={}  modelId={}", userId, modelId)
     }
 
     // ==================== 用户工作区选择（每用户隔离） ====================
@@ -148,7 +148,7 @@ class SessionManager(
     fun setUserWorkspace(userId: Long, workspaceId: UUID) {
         userSelectedWorkspaces[userId] = workspaceId
         scheduleSave()
-        logger.info("User {} selected workspace {}", userId, workspaceId)
+        logger.info("User selected workspace  userId={}  workspaceId={}", userId, workspaceId)
     }
 
     // ==================== 用户 Thinking 设置（每用户隔离） ====================
@@ -170,7 +170,7 @@ class SessionManager(
     fun setUserThinking(userId: Long, enabled: Boolean) {
         userThinking[userId] = enabled
         scheduleSave()
-        logger.info("User {} thinking set to {}", userId, enabled)
+        logger.info("User thinking set  userId={}  enabled={}", userId, enabled)
     }
 
     // ==================== 用户消息历史注入设置（每用户隔离） ====================
@@ -192,7 +192,7 @@ class SessionManager(
     fun setUserHistoryInjection(userId: Long, enabled: Boolean) {
         userHistoryInjection[userId] = enabled
         scheduleSave()
-        logger.info("User {} history injection set to {}", userId, enabled)
+        logger.info("User history injection set  userId={}  enabled={}", userId, enabled)
     }
 
     // ==================== 全局模型配置（操作员管理） ====================
@@ -219,7 +219,7 @@ class SessionManager(
             globalFallbackModels.add(modelId)
         }
         scheduleSave()
-        logger.info("Added fallback model: {}", modelId)
+        logger.info("Fallback model added  modelId={}", modelId)
         return true
     }
 
@@ -232,7 +232,7 @@ class SessionManager(
     fun removeFallbackModel(modelId: UUID): Boolean {
         if (!globalFallbackModels.remove(modelId)) return false
         scheduleSave()
-        logger.info("Removed fallback model: {}", modelId)
+        logger.info("Fallback model removed  modelId={}", modelId)
         return true
     }
 
@@ -244,7 +244,7 @@ class SessionManager(
     fun setSummarizeModel(modelId: UUID) {
         globalSummarizeModel = modelId
         scheduleSave()
-        logger.info("Summarize model set to {}", modelId)
+        logger.info("Summarize model set  modelId={}", modelId)
     }
 
     // ==================== 会话创建 ====================
@@ -264,7 +264,7 @@ class SessionManager(
                     try {
                         core.session.create(workspace.meta.id, config)
                     } catch (e: Exception) {
-                        logger.warn("Failed to create session with workspace {}, falling back to default", selectedWorkspaceId, e)
+                        logger.warn("Failed to create session  workspaceId={}  falling back to default", selectedWorkspaceId, e)
                         trace.add("e", e.stackTraceToString())
                         core.session.create(config)
                     }
@@ -302,7 +302,7 @@ class SessionManager(
         val handle = core.session.getHandle(sessionId)
         core.session.updateTitle(sessionId, title)
         setActiveSession(userId, sessionId)
-        logger.info("Auto-created session {} for user {}", sessionId, userId)
+        logger.info("Session auto-created  sessionId={}  userId={}", sessionId, userId)
         return handle
     }
 

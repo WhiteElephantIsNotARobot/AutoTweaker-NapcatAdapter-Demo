@@ -190,14 +190,13 @@ abstract class NapCatApiImpl(
         return messages.mapNotNull { element ->
             try {
                 val obj = element.jsonObject
-                val messageType = obj["message_type"]?.jsonPrimitive?.content
-                if (messageType == "group") {
+                if (obj["message_type"]?.jsonPrimitive?.content == "group") {
                     json.decodeFromJsonElement(GroupMessageEvent.serializer(), obj)
                 } else {
                     null
                 }
             } catch (e: Exception) {
-                logger.debug("Failed to parse group message: {}", e.message)
+                logger.debug("Failed to parse group message", e)
                 null
             }
         }
@@ -223,14 +222,13 @@ abstract class NapCatApiImpl(
         return messages.mapNotNull { element ->
             try {
                 val obj = element.jsonObject
-                val messageType = obj["message_type"]?.jsonPrimitive?.content
-                if (messageType == "private") {
+                if (obj["message_type"]?.jsonPrimitive?.content == "private") {
                     json.decodeFromJsonElement(PrivateMessageEvent.serializer(), obj)
                 } else {
                     null
                 }
             } catch (e: Exception) {
-                logger.debug("Failed to parse private message: {}", e.message)
+                logger.debug("Failed to parse private message", e)
                 null
             }
         }
@@ -269,7 +267,7 @@ abstract class NapCatApiImpl(
             try {
                 json.decodeFromJsonElement(ForwardMessage.serializer(), element)
             } catch (e: Exception) {
-                logger.debug("Failed to parse forward message: {}", e.message)
+                logger.debug("Failed to parse forward message", e)
                 null
             }
         }

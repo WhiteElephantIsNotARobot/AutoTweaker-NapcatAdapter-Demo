@@ -59,7 +59,7 @@ class SessionPersistence(
             obj[USER_HISTORY_INJECTION_KEY]?.let { loadUserHistoryInjection(it) }
             obj[GLOBAL_CONFIG_KEY]?.let { loadGlobalConfig(it) }
 
-            logger.debug("Loaded {} sessions, {} user models, {} user workspaces, {} user thinking, {} user history injection",
+            logger.debug("Persistence loaded  sessions={}  userModels={}  userWorkspaces={}  userThinking={}  userHistoryInjection={}",
                 activeSessions.size, userPrimaryModels.size, userSelectedWorkspaces.size, userThinking.size, userHistoryInjection.size)
         } catch (e: Exception) {
             logger.warn("Failed to load from store", e)
@@ -125,11 +125,11 @@ class SessionPersistence(
                 try {
                     target[k.toLong()] = valueParser(v)
                 } catch (e: Exception) {
-                    logger.warn("Failed to load entry {} from {}", k, key, e)
+                    logger.warn("Failed to load entry  key={}  source={}", k, key, e)
                 }
             }
         } catch (e: Exception) {
-            logger.warn("Failed to load {}", key, e)
+            logger.warn("Failed to load  key={}", key, e)
         }
     }
 
@@ -160,7 +160,7 @@ class SessionPersistence(
                 try {
                     globalFallbackModels.add(UUID.fromString(it.jsonPrimitive.content))
                 } catch (e: Exception) {
-                    logger.warn("Failed to parse fallback model: {}", it)
+                    logger.warn("Failed to parse fallback model  value={}", it)
                 }
             }
         } catch (e: Exception) {

@@ -65,7 +65,7 @@ class SessionListener(
             pendingToolCalls.remove(sessionId)
             true
         } catch (e: Exception) {
-            logger.warn("拒绝待审批工具调用失败: session={}", sessionId, e)
+            logger.warn("Failed to reject pending tool calls  sessionId={}", sessionId, e)
             trace.add("e", e.stackTraceToString())
             false
         }
@@ -87,7 +87,7 @@ class SessionListener(
         val handle = try {
             core.session.getHandle(sessionId)
         } catch (e: Exception) {
-            logger.warn("Failed to get handle for session {}", sessionId, e)
+            logger.warn("Failed to get session handle  sessionId={}", sessionId, e)
             trace.add("e", e.stackTraceToString())
             return
         }

@@ -28,7 +28,7 @@ class CommandRegistry {
         val name = command.name.lowercase()
         require(name !in commands) { "Command already registered: $name" }
         commands[name] = command
-        logger.debug("Registered command: /{}", name)
+        logger.debug("Command registered  command={}", name)
     }
 
     /**
@@ -75,7 +75,7 @@ class CommandRegistry {
 
         val command = commands[name]
         if (command == null) {
-            logger.warn("Unknown command: /{}", name)
+            logger.warn("Unknown command  command={}", name)
             return "未知命令: /$name\n输入 /help 查看可用命令"
         }
 
@@ -87,7 +87,7 @@ class CommandRegistry {
         return try {
             command.execute(context.copy(args = args))
         } catch (e: Exception) {
-            logger.error("Command execution failed: /{}", name, e)
+            logger.error("Failed to execute command  command={}", name, e)
             "命令执行失败，请稍后重试"
         }
     }

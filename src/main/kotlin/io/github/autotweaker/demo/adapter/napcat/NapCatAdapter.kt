@@ -52,7 +52,7 @@ class NapCatAdapter : Adapter {
     private var adapterScope: CoroutineScope? = null
 
     override suspend fun load(coreVersion: SemVer): AdapterInfo {
-        logger.info("Loading NapCat adapter")
+        logger.info("NapCat adapter loaded")
         return AdapterInfo(
             name = "napcat",
             description = "NapCat adapter for AutoTweaker",
@@ -64,14 +64,13 @@ class NapCatAdapter : Adapter {
     override suspend fun start(core: CoreAPI) {
         initializationState = InitializationState.STARTING
         _core = core
-        logger.info("NapCat adapter starting...")
 
         // 创建适配器级协程作用域
         adapterScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
         // 检查密钥库是否已解锁
         if (!core.secret.isUnlocked.value) {
-            logger.info("Secret is locked, waiting for unlock...")
+            logger.info("Secret locked")
             adapterScope?.launch {
                 waitForUnlockAndInitialize(core)
             }
@@ -87,7 +86,7 @@ class NapCatAdapter : Adapter {
     private suspend fun waitForUnlockAndInitialize(core: CoreAPI) {
         try {
             core.secret.isUnlocked.first { it }
-            logger.info("Secret unlocked, initializing components...")
+            logger.info("Secret unlocked")
             initializationState = InitializationState.INITIALIZING
             initializeComponents(core)
             initializationState = InitializationState.READY
@@ -142,10 +141,10 @@ class NapCatAdapter : Adapter {
             bridge.handleMessage(event)
         }
         client.onConnect {
-            logger.info("Connected to NapCat at {}:{}", host, port)
+            logger.info("Connected to NapCat  host={}  port={}", host, port)
         }
         client.onDisconnect { reason ->
-            logger.warn("Disconnected from NapCat: {}", reason)
+            logger.warn("Disconnected from NapCat  reason={}", reason)
         }
         client.onError { error ->
             logger.error("NapCat WebSocket error", error)
@@ -156,7 +155,7 @@ class NapCatAdapter : Adapter {
             client.connect(host, port, token)
             _napCatApi = client
             logger.debug("_napCatApi set, classloader={}", NapCatAdapter::class.java.classLoader)
-            logger.info("NapCat adapter started, connecting to {}:{}", host, port)
+            logger.info("NapCat adapter connected  host={}  port={}", host, port)
         } catch (e: Exception) {
             _napCatApi = null
             logger.error("Failed to connect to NapCat", e)
@@ -168,13 +167,12 @@ class NapCatAdapter : Adapter {
 
     override suspend fun stop() {
         initializationState = InitializationState.STOPPED
-        logger.info("Stopping NapCat adapter...")
         // 取消所有协程（包括输出监听器）
         adapterScope?.cancel()
         try {
             wsClient?.disconnect()
         } catch (e: Exception) {
-            logger.error("Error disconnecting from NapCat", e)
+            logger.error("Failed to disconnect from NapCat", e)
         }
         wsClient = null
         messageBridge = null

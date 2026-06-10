@@ -78,8 +78,8 @@ class NapCatWsClientImpl(
             try {
                 client!!.webSocket(url) {
                     wsSession = this
-                    logger.info("Connected to NapCat WS at $host:$port")
-                    logger.debug("WebSocket session established, closeReason: {}", closeReason)
+                    logger.info("WebSocket connected  host={}  port={}", host, port)
+                    logger.debug("WebSocket session established  closeReason={}", closeReason)
                     connectHandler?.invoke()
 
                     try {
@@ -92,11 +92,13 @@ class NapCatWsClientImpl(
                                 }
                             }
                         }
+                    } catch (e: CancellationException) {
+                        throw e
                     } catch (e: Exception) {
-                        logger.error("WS error", e)
+                        logger.error("WebSocket error  host={}  port={}", host, port, e)
                         errorHandler?.invoke(e)
                     } finally {
-                        logger.info("WebSocket closing, closeReason: {}", closeReason)
+                        logger.info("WebSocket closed  host={}  port={}", host, port)
                         connected.set(false)
                         wsSession = null
                         // 清理所有待处理的请求
@@ -107,8 +109,10 @@ class NapCatWsClientImpl(
                         disconnectHandler?.invoke(null)
                     }
                 }
+            } catch (e: CancellationException) {
+                connected.set(false)
             } catch (e: Exception) {
-                logger.error("Connection failed", e)
+                logger.error("Failed to connect  host={}  port={}", host, port, e)
                 connected.set(false)
                 errorHandler?.invoke(e)
             }
@@ -144,7 +148,7 @@ class NapCatWsClientImpl(
                 handleEvent(obj)
             }
         } catch (e: Exception) {
-            logger.error("Failed to parse message: $text", e)
+            logger.error("Failed to parse message  length={}", text.length, e)
         }
     }
 
@@ -161,7 +165,7 @@ class NapCatWsClientImpl(
                 dispatchEvent(event)
             }
         } catch (e: Exception) {
-            logger.error("Failed to parse event", e)
+            logger.error("Failed to parse event  postType={}", obj["post_type"]?.jsonPrimitive?.content, e)
         }
     }
 
@@ -230,21 +234,21 @@ class NapCatWsClientImpl(
 
     private suspend fun dispatchEvent(event: OneBotEvent) {
         eventHandlers.forEach { handler ->
-            try { handler(event) } catch (e: Exception) { logger.error("Event handler error", e) }
+            try { handler(event) } catch (e: CancellationException) { throw e } catch (e: Exception) { logger.error("Failed to dispatch event  postType={}", event.javaClass.simpleName, e) }
         }
 
         when (event) {
             is GroupMessageEvent -> {
-                messageHandlers.forEach { try { it(event) } catch (e: Exception) { logger.error("Handler error", e) } }
-                groupMessageHandlers.forEach { try { it(event) } catch (e: Exception) { logger.error("Handler error", e) } }
+                messageHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Exception) { logger.error("Failed to handle group message  groupId={}  userId={}", event.groupId, event.userId, e) } }
+                groupMessageHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Exception) { logger.error("Failed to handle group message  groupId={}  userId={}", event.groupId, event.userId, e) } }
             }
             is PrivateMessageEvent -> {
-                messageHandlers.forEach { try { it(event) } catch (e: Exception) { logger.error("Handler error", e) } }
-                privateMessageHandlers.forEach { try { it(event) } catch (e: Exception) { logger.error("Handler error", e) } }
+                messageHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Exception) { logger.error("Failed to handle private message  userId={}", event.userId, e) } }
+                privateMessageHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Exception) { logger.error("Failed to handle private message  userId={}", event.userId, e) } }
             }
-            is NoticeEvent -> noticeHandlers.forEach { try { it(event) } catch (e: Exception) { logger.error("Handler error", e) } }
-            is RequestEvent -> requestHandlers.forEach { try { it(event) } catch (e: Exception) { logger.error("Handler error", e) } }
-            is MetaEvent -> metaHandlers.forEach { try { it(event) } catch (e: Exception) { logger.error("Handler error", e) } }
+            is NoticeEvent -> noticeHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Exception) { logger.error("Failed to handle notice event  noticeType={}", event.javaClass.simpleName, e) } }
+            is RequestEvent -> requestHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Exception) { logger.error("Failed to handle request event  requestType={}", event.javaClass.simpleName, e) } }
+            is MetaEvent -> metaHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Exception) { logger.error("Failed to handle meta event  metaType={}", event.javaClass.simpleName, e) } }
         }
     }
 
