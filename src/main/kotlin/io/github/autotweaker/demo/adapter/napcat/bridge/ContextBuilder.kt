@@ -1,8 +1,10 @@
 package io.github.autotweaker.demo.adapter.napcat.bridge
 
+import io.github.autotweaker.demo.adapter.napcat.NapCatAdapter
 import io.github.autotweaker.demo.adapter.napcat.api.NapCatApi
 import io.github.autotweaker.demo.adapter.napcat.model.data.ForwardMessage
 import io.github.autotweaker.demo.adapter.napcat.model.message.MessageSegment
+import io.github.autotweaker.api.trace.TraceRecorder
 import org.slf4j.LoggerFactory
 
 /**
@@ -23,6 +25,7 @@ class ContextBuilder(
 ) {
 
     private val logger = LoggerFactory.getLogger(this::class.java)
+    private val trace: TraceRecorder by lazy { NapCatAdapter.core.trace(this::class) }
 
     /**
      * 构建带上下文的消息
@@ -31,16 +34,16 @@ class ContextBuilder(
      * 消息历史注入可通过用户设置关闭。
      */
     suspend fun buildMessageWithContext(groupId: Long?, userId: Long, text: String): String {
-        return try {
+        return trace.catching {
             val contextBuilder = StringBuilder()
 
             // 注入会话所在的群/私聊信息
             contextBuilder.appendLine("<session-info>")
             if (groupId != null) {
                 // 群聊：获取群名并注入群号和群名
-                val groupName = try {
+                val groupName = trace.catching {
                     napCat.getGroupList().find { it.groupId == groupId }?.groupName?.let { escapeXml(it) }
-                } catch (e: Exception) {
+                }.getOrElse { e ->
                     logger.warn("Failed to get group list  groupId={}", groupId, e)
                     null
                 }
@@ -62,24 +65,22 @@ class ContextBuilder(
             val historyEnabled = sessionManager.getUserHistoryInjection(userId)
             if (historyEnabled) {
                 // 获取消息历史
-                val messages = try {
+                val messages = trace.catching {
                     if (groupId != null) {
                         napCat.getGroupMsgHistory(groupId, count = 20)
                     } else {
                         napCat.getPrivateMsgHistory(userId, count = 20)
                     }
-                } catch (e: Exception) {
+                }.getOrElse { e ->
                     logger.warn("Failed to load message history", e)
                     emptyList()
                 }
 
                 // 获取群成员列表用于获取昵称（仅群聊）
                 val members = if (groupId != null) {
-                    try {
+                    trace.catching {
                         napCat.getGroupMemberList(groupId)
-                    } catch (e: Exception) {
-                        emptyList()
-                    }
+                    }.getOrElse { emptyList() }
                 } else {
                     emptyList()
                 }
@@ -101,11 +102,11 @@ class ContextBuilder(
                     // 检测合并转发消息
                     val forwardId = extractForwardId(msg.rawMessage)
                     if (forwardId != null) {
-                        try {
+                        trace.catching {
                             val forwardContent = napCat.getForwardMsg(forwardId)
                             forwardMessages[forwardId] = forwardContent
                             contextBuilder.appendLine("[$time] $nickname: [合并转发消息 id=$forwardId]")
-                        } catch (e: Exception) {
+                        }.onFailure { e ->
                             logger.warn("Failed to get forward message  forwardId={}", forwardId, e)
                             contextBuilder.appendLine("[$time] $nickname: ${escapeXml(msg.rawMessage)}")
                         }
@@ -146,7 +147,7 @@ class ContextBuilder(
             val result = contextBuilder.toString()
             logger.debug("Message context built  userId={}  groupId={}  length={}", userId, groupId, result.length)
             result
-        } catch (e: Exception) {
+        }.getOrElse { e ->
             logger.error("Failed to build message context", e)
             // 失败时只发送原始消息
             text
@@ -162,7 +163,7 @@ class ContextBuilder(
         var result = text
         forwardSegments.forEach { forward ->
             val forwardId = forward.id
-            try {
+            trace.catching {
                 val forwardContent = napCat.getForwardMsg(forwardId)
                 if (forwardContent.isNotEmpty()) {
                     val forwardText = buildString {
@@ -177,7 +178,7 @@ class ContextBuilder(
                     // 替换 CQ 码为实际内容
                     result = result.replace("[CQ:forward,id=$forwardId]", forwardText)
                 }
-            } catch (e: Exception) {
+            }.onFailure { e ->
                 logger.warn("Failed to get forward message {}: {}", forwardId, e.message)
             }
         }
