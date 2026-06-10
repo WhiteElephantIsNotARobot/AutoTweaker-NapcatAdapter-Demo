@@ -3,6 +3,7 @@ package io.github.autotweaker.demo.adapter.napcat.ws
 import io.github.autotweaker.demo.adapter.napcat.NapCatAdapter
 import io.github.autotweaker.demo.adapter.napcat.model.event.*
 import io.ktor.client.*
+import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.websocket.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.*
@@ -67,8 +68,11 @@ class NapCatWsClientImpl(
         }
 
         client?.close()
-        client = HttpClient {
-            install(WebSockets)
+        // 显式使用 CIO 引擎，避免 Java 引擎（java.net.http.WebSocket）的兼容问题
+        client = HttpClient(CIO) {
+            install(WebSockets) {
+                pingIntervalMillis = 20_000
+            }
         }
 
         connectJob = CoroutineScope(Dispatchers.Default + SupervisorJob()).launch {
