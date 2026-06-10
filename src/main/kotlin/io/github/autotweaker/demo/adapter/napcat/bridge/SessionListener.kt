@@ -61,13 +61,13 @@ class SessionListener(
     suspend fun rejectPendingCalls(sessionId: UUID, reason: String): Boolean {
         val callIds = pendingToolCalls[sessionId] ?: return false
         if (callIds.isEmpty()) return false
-        return try {
+        return trace.catching {
             val approvals = callIds.map { ToolApprove(callId = it, approved = false, reason = reason) }
             core.session.approveToolCall(sessionId, approvals)
             trace.add("session_reject_pending", "session=$sessionId, count=${callIds.size}")
             pendingToolCalls.remove(sessionId)
             true
-        } catch (e: Exception) {
+        }.getOrElse { e ->
             logger.warn("Failed to reject pending tool calls  sessionId={}", sessionId, e)
             false
         }
@@ -86,9 +86,9 @@ class SessionListener(
      * 确保会话的输出和上下文监听器已启动
      */
     suspend fun ensureListeners(sessionId: UUID) {
-        val handle = try {
+        val handle = trace.catching {
             core.session.getHandle(sessionId)
-        } catch (e: Exception) {
+        }.getOrElse { e ->
             logger.warn("Failed to get session handle  sessionId={}", sessionId, e)
             return
         }
@@ -156,13 +156,13 @@ class SessionListener(
     suspend fun tryApproveAll(handleId: UUID): String? {
         val callIds = pendingToolCalls[handleId] ?: return null
         if (callIds.isEmpty()) return null
-        return try {
+        return trace.catching {
             val approvals = callIds.map { ToolApprove(callId = it, approved = true) }
             core.session.approveToolCall(handleId, approvals)
             trace.add("session_approve", "session=$handleId, approvals=$approvals")
             pendingToolCalls.remove(handleId)
             "已审批全部 ${callIds.size} 个工具调用"
-        } catch (e: Exception) {
+        }.getOrElse { e ->
             "审批失败: ${e.message}"
         }
     }
@@ -294,11 +294,9 @@ class SessionListener(
      * 获取会话中的消息总数
      */
     private suspend fun getMessageCount(sessionId: UUID): Int? {
-        val handle = try {
+        val handle = trace.catching {
             core.session.getHandle(sessionId)
-        } catch (e: Exception) {
-            return null
-        }
+        }.getOrElse { return null }
         val context = handle.context.value
         return getMessageCountFromIndex(context.index)
     }
@@ -332,13 +330,11 @@ class SessionListener(
     }
 
     private fun formatArguments(arguments: String): List<String>? {
-        return try {
+        return trace.catching {
             val lines = mutableListOf<String>()
             appendJson(Json.parseToJsonElement(arguments).jsonObject, lines, "")
             lines
-        } catch (e: Exception) {
-            null
-        }
+        }.getOrElse { null }
     }
 
     private fun appendJson(
