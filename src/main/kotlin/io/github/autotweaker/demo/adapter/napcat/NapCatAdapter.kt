@@ -3,6 +3,7 @@ package io.github.autotweaker.demo.adapter.napcat
 import com.google.auto.service.AutoService
 import io.github.autotweaker.api.adapter.Adapter
 import io.github.autotweaker.api.adapter.CoreAPI
+import io.github.autotweaker.api.trace.TraceRecorder
 import io.github.autotweaker.api.types.SemVer
 import io.github.autotweaker.api.types.Url
 import io.github.autotweaker.api.types.adapter.AdapterInfo
@@ -47,6 +48,7 @@ class NapCatAdapter : Adapter {
     }
 
     private val logger = LoggerFactory.getLogger(this::class.java)
+    private val trace: TraceRecorder by lazy { core.trace(this::class) }
     private var wsClient: NapCatWsClient? = null
     private var messageBridge: MessageBridge? = null
     private var adapterScope: CoroutineScope? = null
@@ -93,6 +95,7 @@ class NapCatAdapter : Adapter {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            trace.exception(e)
             logger.error("Failed to initialize after unlock", e)
         }
     }
@@ -151,12 +154,12 @@ class NapCatAdapter : Adapter {
         }
 
         // 连接
-        try {
+        trace.catching {
             client.connect(host, port, token)
             _napCatApi = client
             logger.debug("_napCatApi set, classloader={}", NapCatAdapter::class.java.classLoader)
             logger.info("NapCat adapter connected  host={}  port={}", host, port)
-        } catch (e: Exception) {
+        }.onFailure { e ->
             _napCatApi = null
             logger.error("Failed to connect to NapCat", e)
         }
@@ -169,9 +172,9 @@ class NapCatAdapter : Adapter {
         initializationState = InitializationState.STOPPED
         // 取消所有协程（包括输出监听器）
         adapterScope?.cancel()
-        try {
+        trace.catching {
             wsClient?.disconnect()
-        } catch (e: Exception) {
+        }.onFailure { e ->
             logger.error("Failed to disconnect from NapCat", e)
         }
         wsClient = null

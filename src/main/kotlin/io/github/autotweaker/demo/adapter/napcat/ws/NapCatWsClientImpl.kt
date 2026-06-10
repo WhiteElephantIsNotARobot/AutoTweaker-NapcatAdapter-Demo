@@ -98,6 +98,7 @@ class NapCatWsClientImpl(
                                         } catch (e: CancellationException) {
                                             throw e
                                         } catch (e: Throwable) {
+                                            trace.exception(e)
                                             logger.error("Failed to handle message  length={}", text.length, e)
                                         }
                                     }
@@ -106,6 +107,7 @@ class NapCatWsClientImpl(
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {
+                            trace.exception(e)
                             logger.error("WebSocket error  host={}  port={}", host, port, e)
                             errorHandler?.invoke(e)
                         } finally {
@@ -127,6 +129,7 @@ class NapCatWsClientImpl(
                     disconnectHandler?.invoke(null)
                     break
                 } catch (e: Throwable) {
+                    trace.exception(e)
                     if (wasEverConnected) {
                         logger.warn("Connection lost, will retry  host={}  port={}  retryDelayMs={}", host, port, retryDelay, e)
                     } else {
@@ -173,6 +176,7 @@ class NapCatWsClientImpl(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
+            trace.exception(e)
             logger.error("Failed to parse message  length={}", text.length, e)
         }
     }
@@ -184,12 +188,12 @@ class NapCatWsClientImpl(
     }
 
     private suspend fun handleEvent(obj: JsonObject) {
-        try {
+        trace.catching {
             val event = parseEvent(obj)
             if (event != null) {
                 dispatchEvent(event)
             }
-        } catch (e: Exception) {
+        }.onFailure { e ->
             logger.error("Failed to parse event  postType={}", obj["post_type"]?.jsonPrimitive?.content, e)
         }
     }
@@ -259,21 +263,21 @@ class NapCatWsClientImpl(
 
     private suspend fun dispatchEvent(event: OneBotEvent) {
         eventHandlers.forEach { handler ->
-            try { handler(event) } catch (e: CancellationException) { throw e } catch (e: Throwable) { logger.error("Failed to dispatch event  postType={}", event.javaClass.simpleName, e) }
+            try { handler(event) } catch (e: CancellationException) { throw e } catch (e: Throwable) { trace.exception(e); logger.error("Failed to dispatch event  postType={}", event.javaClass.simpleName, e) }
         }
 
         when (event) {
             is GroupMessageEvent -> {
-                messageHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Throwable) { logger.error("Failed to handle group message  groupId={}  userId={}", event.groupId, event.userId, e) } }
-                groupMessageHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Throwable) { logger.error("Failed to handle group message  groupId={}  userId={}", event.groupId, event.userId, e) } }
+                messageHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Throwable) { trace.exception(e); logger.error("Failed to handle group message  groupId={}  userId={}", event.groupId, event.userId, e) } }
+                groupMessageHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Throwable) { trace.exception(e); logger.error("Failed to handle group message  groupId={}  userId={}", event.groupId, event.userId, e) } }
             }
             is PrivateMessageEvent -> {
-                messageHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Throwable) { logger.error("Failed to handle private message  userId={}", event.userId, e) } }
-                privateMessageHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Throwable) { logger.error("Failed to handle private message  userId={}", event.userId, e) } }
+                messageHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Throwable) { trace.exception(e); logger.error("Failed to handle private message  userId={}", event.userId, e) } }
+                privateMessageHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Throwable) { trace.exception(e); logger.error("Failed to handle private message  userId={}", event.userId, e) } }
             }
-            is NoticeEvent -> noticeHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Throwable) { logger.error("Failed to handle notice event  noticeType={}", event.javaClass.simpleName, e) } }
-            is RequestEvent -> requestHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Throwable) { logger.error("Failed to handle request event  requestType={}", event.javaClass.simpleName, e) } }
-            is MetaEvent -> metaHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Throwable) { logger.error("Failed to handle meta event  metaType={}", event.javaClass.simpleName, e) } }
+            is NoticeEvent -> noticeHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Throwable) { trace.exception(e); logger.error("Failed to handle notice event  noticeType={}", event.javaClass.simpleName, e) } }
+            is RequestEvent -> requestHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Throwable) { trace.exception(e); logger.error("Failed to handle request event  requestType={}", event.javaClass.simpleName, e) } }
+            is MetaEvent -> metaHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Throwable) { trace.exception(e); logger.error("Failed to handle meta event  metaType={}", event.javaClass.simpleName, e) } }
         }
     }
 
