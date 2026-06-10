@@ -93,7 +93,13 @@ class NapCatWsClientImpl(
                                     val text = frame.readText()
                                     trace.add("response", text)
                                     launch {
-                                        handleMessage(text)
+                                        try {
+                                            handleMessage(text)
+                                        } catch (e: CancellationException) {
+                                            throw e
+                                        } catch (e: Throwable) {
+                                            logger.error("Unhandled error in message handler  length={}", text.length, e)
+                                        }
                                     }
                                 }
                             }
@@ -160,7 +166,9 @@ class NapCatWsClientImpl(
             } else if (obj.containsKey("post_type")) {
                 handleEvent(obj)
             }
-        } catch (e: Exception) {
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
             logger.error("Failed to parse message  length={}", text.length, e)
         }
     }
@@ -247,21 +255,21 @@ class NapCatWsClientImpl(
 
     private suspend fun dispatchEvent(event: OneBotEvent) {
         eventHandlers.forEach { handler ->
-            try { handler(event) } catch (e: CancellationException) { throw e } catch (e: Exception) { logger.error("Failed to dispatch event  postType={}", event.javaClass.simpleName, e) }
+            try { handler(event) } catch (e: CancellationException) { throw e } catch (e: Throwable) { logger.error("Failed to dispatch event  postType={}", event.javaClass.simpleName, e) }
         }
 
         when (event) {
             is GroupMessageEvent -> {
-                messageHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Exception) { logger.error("Failed to handle group message  groupId={}  userId={}", event.groupId, event.userId, e) } }
-                groupMessageHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Exception) { logger.error("Failed to handle group message  groupId={}  userId={}", event.groupId, event.userId, e) } }
+                messageHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Throwable) { logger.error("Failed to handle group message  groupId={}  userId={}", event.groupId, event.userId, e) } }
+                groupMessageHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Throwable) { logger.error("Failed to handle group message  groupId={}  userId={}", event.groupId, event.userId, e) } }
             }
             is PrivateMessageEvent -> {
-                messageHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Exception) { logger.error("Failed to handle private message  userId={}", event.userId, e) } }
-                privateMessageHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Exception) { logger.error("Failed to handle private message  userId={}", event.userId, e) } }
+                messageHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Throwable) { logger.error("Failed to handle private message  userId={}", event.userId, e) } }
+                privateMessageHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Throwable) { logger.error("Failed to handle private message  userId={}", event.userId, e) } }
             }
-            is NoticeEvent -> noticeHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Exception) { logger.error("Failed to handle notice event  noticeType={}", event.javaClass.simpleName, e) } }
-            is RequestEvent -> requestHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Exception) { logger.error("Failed to handle request event  requestType={}", event.javaClass.simpleName, e) } }
-            is MetaEvent -> metaHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Exception) { logger.error("Failed to handle meta event  metaType={}", event.javaClass.simpleName, e) } }
+            is NoticeEvent -> noticeHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Throwable) { logger.error("Failed to handle notice event  noticeType={}", event.javaClass.simpleName, e) } }
+            is RequestEvent -> requestHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Throwable) { logger.error("Failed to handle request event  requestType={}", event.javaClass.simpleName, e) } }
+            is MetaEvent -> metaHandlers.forEach { try { it(event) } catch (e: CancellationException) { throw e } catch (e: Throwable) { logger.error("Failed to handle meta event  metaType={}", event.javaClass.simpleName, e) } }
         }
     }
 
