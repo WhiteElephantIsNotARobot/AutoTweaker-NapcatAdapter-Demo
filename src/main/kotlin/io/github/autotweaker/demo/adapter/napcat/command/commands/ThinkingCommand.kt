@@ -19,7 +19,7 @@ import org.slf4j.LoggerFactory
  */
 class ThinkingCommand : Command {
 
-    private val logger = LoggerFactory.getLogger(ThinkingCommand::class.java)
+    private val logger = LoggerFactory.getLogger(this::class.java)
     private lateinit var trace: TraceRecorder
 
     override val name = "thinking"

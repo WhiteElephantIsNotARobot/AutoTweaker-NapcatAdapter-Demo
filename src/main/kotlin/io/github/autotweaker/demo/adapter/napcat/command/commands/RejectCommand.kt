@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory
  */
 class RejectCommand : Command {
 
-    private val logger = LoggerFactory.getLogger(RejectCommand::class.java)
+    private val logger = LoggerFactory.getLogger(this::class.java)
     private lateinit var trace: TraceRecorder
 
     override val name = "reject"

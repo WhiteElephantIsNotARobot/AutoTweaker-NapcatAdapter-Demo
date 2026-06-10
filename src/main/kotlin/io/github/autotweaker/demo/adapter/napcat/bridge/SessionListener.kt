@@ -33,7 +33,7 @@ class SessionListener(
     private val sendToSession: suspend (sessionId: UUID, text: String) -> Unit
 ) {
 
-    private val logger = LoggerFactory.getLogger(SessionListener::class.java)
+    private val logger = LoggerFactory.getLogger(this::class.java)
     private val trace = core.trace(this::class)
 
     /** 正在监听输出的会话集合，防止重复监听 */

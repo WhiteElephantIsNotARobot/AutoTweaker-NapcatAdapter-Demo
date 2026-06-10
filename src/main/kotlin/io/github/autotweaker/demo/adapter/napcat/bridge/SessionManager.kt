@@ -30,7 +30,7 @@ class SessionManager(
     private val permissionManager: PermissionManager
 ) {
 
-    private val logger = LoggerFactory.getLogger(SessionManager::class.java)
+    private val logger = LoggerFactory.getLogger(this::class.java)
     private val trace = core.trace(this::class)
 
     /** userId → sessionId */

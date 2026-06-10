@@ -21,7 +21,7 @@ abstract class NapCatApiImpl(
     protected val json: Json
 ) : NapCatApi {
 
-    private val logger = LoggerFactory.getLogger(NapCatApiImpl::class.java)
+    private val logger = LoggerFactory.getLogger(this::class.java)
 
     /**
      * 发送 OneBot API 请求并获取原始 JSON 响应

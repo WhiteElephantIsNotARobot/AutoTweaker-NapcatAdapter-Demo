@@ -41,7 +41,7 @@ class MessageBridge(
     private val scope: CoroutineScope
 ) {
 
-    private val logger = LoggerFactory.getLogger(MessageBridge::class.java)
+    private val logger = LoggerFactory.getLogger(this::class.java)
     private val trace = core.trace(this::class)
 
     private val contextBuilder = ContextBuilder(napCat, sessionManager)

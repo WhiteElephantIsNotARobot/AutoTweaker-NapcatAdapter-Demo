@@ -33,7 +33,7 @@ class SessionPersistence(
     private val globalSummarizeModel: () -> UUID?
 ) {
 
-    private val logger = LoggerFactory.getLogger(SessionPersistence::class.java)
+    private val logger = LoggerFactory.getLogger(this::class.java)
 
     companion object {
         private const val SESSION_MAP_KEY = "session_map"

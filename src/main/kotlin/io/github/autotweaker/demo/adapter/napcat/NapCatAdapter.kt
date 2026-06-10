@@ -46,7 +46,7 @@ class NapCatAdapter : Adapter {
         val napCatApi: NapCatApi get() = _napCatApi ?: throw IllegalStateException("NapCatAPI not initialized (state=$initializationState)")
     }
 
-    private val logger = LoggerFactory.getLogger(NapCatAdapter::class.java)
+    private val logger = LoggerFactory.getLogger(this::class.java)
     private var wsClient: NapCatWsClient? = null
     private var messageBridge: MessageBridge? = null
     private var adapterScope: CoroutineScope? = null

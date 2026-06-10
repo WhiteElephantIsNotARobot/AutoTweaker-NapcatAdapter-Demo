@@ -25,7 +25,7 @@ import java.util.concurrent.CopyOnWriteArrayList
  */
 class PermissionManager(private val core: CoreAPI) {
 
-    private val logger = LoggerFactory.getLogger(PermissionManager::class.java)
+    private val logger = LoggerFactory.getLogger(this::class.java)
 
     private val store by lazy {
         core.config.jsonStore(PermissionManager::class)

@@ -15,7 +15,7 @@ class CommandRegistry {
         private val WHITESPACE_REGEX = "\\s+".toRegex()
     }
 
-    private val logger = LoggerFactory.getLogger(CommandRegistry::class.java)
+    private val logger = LoggerFactory.getLogger(this::class.java)
     private val commands = mutableMapOf<String, Command>()
 
     /**

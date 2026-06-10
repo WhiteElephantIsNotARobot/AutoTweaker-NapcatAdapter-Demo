@@ -48,7 +48,7 @@ class QqTool : Tool<QqToolFunctions.Args> {
     override val name = "qq"
     override val description = "QQ 机器人操作工具，提供消息收发、群管理、好友查询等功能"
 
-    private val logger = LoggerFactory.getLogger(QqTool::class.java)
+    private val logger = LoggerFactory.getLogger(this::class.java)
 
     override suspend fun describe(): Map<KProperty1<*, *>, String> = mapOf(
         // 消息

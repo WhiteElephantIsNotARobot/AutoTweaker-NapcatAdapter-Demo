@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory
  */
 class ApproveCommand : Command {
 
-    private val logger = LoggerFactory.getLogger(ApproveCommand::class.java)
+    private val logger = LoggerFactory.getLogger(this::class.java)
     private lateinit var trace: TraceRecorder
 
     override val name = "approve"

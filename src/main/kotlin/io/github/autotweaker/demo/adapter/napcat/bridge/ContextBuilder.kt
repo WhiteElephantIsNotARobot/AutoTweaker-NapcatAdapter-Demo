@@ -22,7 +22,7 @@ class ContextBuilder(
     private val sessionManager: SessionManager
 ) {
 
-    private val logger = LoggerFactory.getLogger(ContextBuilder::class.java)
+    private val logger = LoggerFactory.getLogger(this::class.java)
 
     /**
      * 构建带上下文的消息

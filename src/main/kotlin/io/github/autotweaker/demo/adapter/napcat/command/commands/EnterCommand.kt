@@ -13,7 +13,7 @@ import java.util.UUID
  */
 class EnterCommand : Command {
 
-    private val logger = LoggerFactory.getLogger(EnterCommand::class.java)
+    private val logger = LoggerFactory.getLogger(this::class.java)
 
     override val name = "enter"
     override val description = "进入指定会话"

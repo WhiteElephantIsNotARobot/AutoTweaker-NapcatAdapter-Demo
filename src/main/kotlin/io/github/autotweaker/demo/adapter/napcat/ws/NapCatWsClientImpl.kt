@@ -29,7 +29,7 @@ class NapCatWsClientImpl(
     json: Json = Json { ignoreUnknownKeys = true; isLenient = true }
 ) : NapCatApiImpl(json), NapCatWsClient {
 
-    private val logger = LoggerFactory.getLogger(NapCatWsClientImpl::class.java)
+    private val logger = LoggerFactory.getLogger(this::class.java)
     private val trace = NapCatAdapter.core.trace(this::class)
 
     @Volatile private var wsSession: WebSocketSession? = null
