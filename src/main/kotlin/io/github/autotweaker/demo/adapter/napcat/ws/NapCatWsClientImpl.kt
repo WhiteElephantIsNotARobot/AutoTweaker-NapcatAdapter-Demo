@@ -98,7 +98,7 @@ class NapCatWsClientImpl(
                                         } catch (e: CancellationException) {
                                             throw e
                                         } catch (e: Throwable) {
-                                            logger.error("Unhandled error in message handler  length={}", text.length, e)
+                                            logger.error("Failed to handle message  length={}", text.length, e)
                                         }
                                     }
                                 }
@@ -109,7 +109,11 @@ class NapCatWsClientImpl(
                             logger.error("WebSocket error  host={}  port={}", host, port, e)
                             errorHandler?.invoke(e)
                         } finally {
-                            val reason = withTimeoutOrNull(500) { closeReason.await() }
+                            val reason = try {
+                                withTimeoutOrNull(500) { closeReason.await() }
+                            } catch (_: CancellationException) {
+                                null
+                            }
                             logger.warn("WebSocket closed  host={}  port={}  closeReason={}", host, port, reason)
                             wsSession = null
                             pendingRequests.forEach { (_, channel) ->
@@ -122,11 +126,11 @@ class NapCatWsClientImpl(
                     connected.set(false)
                     disconnectHandler?.invoke(null)
                     break
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     if (wasEverConnected) {
-                        logger.warn("Connection lost, retrying in {}ms  host={}  port={}", retryDelay, host, port, e)
+                        logger.warn("Connection lost, will retry  host={}  port={}  retryDelayMs={}", host, port, retryDelay, e)
                     } else {
-                        logger.warn("Failed to connect, retrying in {}ms  host={}  port={}", retryDelay, host, port, e)
+                        logger.warn("Failed to connect, will retry  host={}  port={}  retryDelayMs={}", host, port, retryDelay, e)
                         errorHandler?.invoke(e)
                     }
                 }
