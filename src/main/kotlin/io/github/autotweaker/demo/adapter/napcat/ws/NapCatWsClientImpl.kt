@@ -61,60 +61,69 @@ class NapCatWsClientImpl(
         if (!connected.compareAndSet(false, true)) return
 
         val hostPart = if (host.contains(":")) "[$host]" else host
-        // WARNING: 使用 ws:// 非加密连接，建议在可信网络环境中使用
-        // WARNING: Token 通过 URL 参数传输，建议在可信网络环境中使用
         val url = buildString {
             append("ws://$hostPart:$port/")
             if (token != null) append("?access_token=$token")
         }
 
-        // 关闭旧的 HttpClient
         client?.close()
         client = HttpClient {
             install(WebSockets)
         }
 
         connectJob = CoroutineScope(Dispatchers.Default + SupervisorJob()).launch {
-            try {
-                client!!.webSocket(url) {
-                    wsSession = this
-                    logger.info("WebSocket connected  host={}  port={}", host, port)
-                    logger.debug("WebSocket session established  closeReason={}", closeReason)
-                    connectHandler?.invoke()
+            var retryDelay = INITIAL_RETRY_DELAY_MS
+            var wasEverConnected = false
+            while (isActive) {
+                try {
+                    client!!.webSocket(url) {
+                        wsSession = this
+                        logger.info("WebSocket connected  host={}  port={}", host, port)
+                        logger.debug("WebSocket session established  closeReason={}", closeReason)
+                        retryDelay = INITIAL_RETRY_DELAY_MS
+                        wasEverConnected = true
+                        connectHandler?.invoke()
 
-                    try {
-                        for (frame in incoming) {
-                            if (frame is Frame.Text) {
-                                val text = frame.readText()
-                                trace.add("response", text)
-                                launch {
-                                    handleMessage(text)
+                        try {
+                            for (frame in incoming) {
+                                if (frame is Frame.Text) {
+                                    val text = frame.readText()
+                                    trace.add("response", text)
+                                    launch {
+                                        handleMessage(text)
+                                    }
                                 }
                             }
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            logger.error("WebSocket error  host={}  port={}", host, port, e)
+                            errorHandler?.invoke(e)
+                        } finally {
+                            logger.info("WebSocket closed  host={}  port={}", host, port)
+                            wsSession = null
+                            pendingRequests.forEach { (_, channel) ->
+                                channel.close()
+                            }
+                            pendingRequests.clear()
                         }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        logger.error("WebSocket error  host={}  port={}", host, port, e)
+                    }
+                } catch (e: CancellationException) {
+                    connected.set(false)
+                    disconnectHandler?.invoke(null)
+                    break
+                } catch (e: Exception) {
+                    if (wasEverConnected) {
+                        logger.warn("Connection lost, retrying in {}ms  host={}  port={}", retryDelay, host, port, e)
+                    } else {
+                        logger.warn("Failed to connect, retrying in {}ms  host={}  port={}", retryDelay, host, port, e)
                         errorHandler?.invoke(e)
-                    } finally {
-                        logger.info("WebSocket closed  host={}  port={}", host, port)
-                        connected.set(false)
-                        wsSession = null
-                        // 清理所有待处理的请求
-                        pendingRequests.forEach { (_, channel) ->
-                            channel.close()
-                        }
-                        pendingRequests.clear()
-                        disconnectHandler?.invoke(null)
                     }
                 }
-            } catch (e: CancellationException) {
-                connected.set(false)
-            } catch (e: Exception) {
-                logger.error("Failed to connect  host={}  port={}", host, port, e)
-                connected.set(false)
-                errorHandler?.invoke(e)
+
+                if (!isActive) break
+                delay(retryDelay)
+                retryDelay = (retryDelay * RETRY_BACKOFF_MULTIPLIER).coerceAtMost(MAX_RETRY_DELAY_MS)
             }
         }
     }
@@ -328,6 +337,9 @@ class NapCatWsClientImpl(
 
     companion object {
         private const val CALL_API_TIMEOUT_MS = 30_000L
+        private const val INITIAL_RETRY_DELAY_MS = 1_000L
+        private const val MAX_RETRY_DELAY_MS = 60_000L
+        private const val RETRY_BACKOFF_MULTIPLIER = 2L
     }
 }
 
