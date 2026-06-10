@@ -6,7 +6,6 @@ import io.ktor.client.*
 import io.ktor.client.plugins.websocket.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.*
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.serialization.json.*
 import org.slf4j.LoggerFactory
@@ -58,7 +57,6 @@ class NapCatWsClientImpl(
 
     // ==================== 连接管理 ====================
 
-    @OptIn(ExperimentalCoroutinesApi::class)
     override suspend fun connect(host: String, port: Int, token: String?) {
         if (!connected.compareAndSet(false, true)) return
 
@@ -81,7 +79,6 @@ class NapCatWsClientImpl(
                     client!!.webSocket(url) {
                         wsSession = this
                         logger.info("WebSocket connected  host={}  port={}", host, port)
-                        logger.debug("WebSocket session established  closeReason={}", closeReason)
                         retryDelay = INITIAL_RETRY_DELAY_MS
                         wasEverConnected = true
                         connectHandler?.invoke()
@@ -102,7 +99,7 @@ class NapCatWsClientImpl(
                             logger.error("WebSocket error  host={}  port={}", host, port, e)
                             errorHandler?.invoke(e)
                         } finally {
-                            val reason = try { closeReason.getCompleted() } catch (_: IllegalStateException) { null }
+                            val reason = withTimeoutOrNull(500) { closeReason.await() }
                             logger.warn("WebSocket closed  host={}  port={}  closeReason={}", host, port, reason)
                             wsSession = null
                             pendingRequests.forEach { (_, channel) ->
