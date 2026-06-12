@@ -17,58 +17,58 @@ object QqToolFunctions {
     // ==================== 消息 ====================
 
     @Serializable
-    data class SendMessageArgs(
+    data class SendMessage(
         val userId: Long,
         val message: String,
     ) : Args
 
     @Serializable
-    data class SendGroupMessageArgs(
+    data class SendGroupMessage(
         val groupId: Long,
         val message: String,
     ) : Args
 
     @Serializable
-    data class DeleteMessageArgs(
+    data class DeleteMessage(
         val messageId: Int,
     ) : Args
 
     @Serializable
-    data class GetMessageArgs(
+    data class GetMessage(
         val messageId: Int,
     ) : Args
 
     // ==================== 好友 ====================
 
     @Serializable
-    data object GetFriendListArgs : Args
+    data object GetFriendList : Args
 
     // ==================== 群组查询 ====================
 
     @Serializable
-    data class GetGroupListArgs(
+    data class GetGroupList(
         val noCache: Boolean = false,
     ) : Args
 
     @Serializable
-    data class GetGroupMemberListArgs(
+    data class GetGroupMemberList(
         val groupId: Long,
     ) : Args
 
     @Serializable
-    data class GetGroupMemberInfoArgs(
+    data class GetGroupMemberInfo(
         val groupId: Long,
         val userId: Long,
     ) : Args
 
     @Serializable
-    data class GetGroupMsgHistoryArgs(
+    data class GetGroupMsgHistory(
         val groupId: Long,
         val count: Int = 20,
     ) : Args
 
     @Serializable
-    data class GetPrivateMsgHistoryArgs(
+    data class GetPrivateMsgHistory(
         val userId: Long,
         val count: Int = 20,
     ) : Args
@@ -76,34 +76,34 @@ object QqToolFunctions {
     // ==================== 群管理 ====================
 
     @Serializable
-    data class KickGroupMemberArgs(
+    data class KickGroupMember(
         val groupId: Long,
         val userId: Long,
         val reject: Boolean = false,
     ) : Args
 
     @Serializable
-    data class BanGroupMemberArgs(
+    data class BanGroupMember(
         val groupId: Long,
         val userId: Long,
         val duration: Int = 1800,
     ) : Args
 
     @Serializable
-    data class SetGroupCardArgs(
+    data class SetGroupCard(
         val groupId: Long,
         val userId: Long,
         val card: String,
     ) : Args
 
     @Serializable
-    data class SetGroupNameArgs(
+    data class SetGroupName(
         val groupId: Long,
         val groupName: String,
     ) : Args
 
     @Serializable
-    data class SetGroupAdminArgs(
+    data class SetGroupAdmin(
         val groupId: Long,
         val userId: Long,
         val enable: Boolean,
@@ -112,36 +112,36 @@ object QqToolFunctions {
     // ==================== 系统 ====================
 
     @Serializable
-    data object GetLoginInfoArgs : Args
+    data object GetLoginInfo : Args
 
     @Serializable
-    data object GetStatusArgs : Args
+    data object GetStatus : Args
 
     @Serializable
-    data object GetVersionInfoArgs : Args
+    data object GetVersionInfo : Args
 
     // ==================== 文件 ====================
 
     @Serializable
-    data class GetImageArgs(
+    data class GetImage(
         val file: String,
     ) : Args
 
     @Serializable
-    data class GetRecordArgs(
+    data class GetRecord(
         val file: String,
         val outFormat: String? = null,
     ) : Args
 
     @Serializable
-    data class GetFileArgs(
+    data class GetFile(
         val file: String,
     ) : Args
 
     // ==================== 合并转发 ====================
 
     @Serializable
-    data class GetForwardMsgArgs(
+    data class GetForwardMsg(
         val id: String,
     ) : Args
 }
