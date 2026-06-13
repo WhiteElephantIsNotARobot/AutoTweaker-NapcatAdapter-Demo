@@ -9,9 +9,12 @@ import io.github.autotweaker.api.types.session.SessionContext
 import io.github.autotweaker.api.types.session.SessionContextIndex
 import io.github.autotweaker.api.types.session.SessionMessage
 import io.github.autotweaker.api.types.session.SessionOutput
+import io.github.autotweaker.api.types.session.ToolCallRequest
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import io.github.autotweaker.api.types.tool.args.BashArgs
+import io.github.autotweaker.api.types.tool.args.ReadArgs
+import io.github.autotweaker.demo.adapter.napcat.tool.QqToolFunctions
+import kotlinx.serialization.json.JsonElement
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -181,24 +184,9 @@ class SessionListener(
                     val callIds = sessionOutput.requests.map { it.callId }
                     pendingToolCalls.merge(sessionId, callIds) { old, new -> old + new }
 
-                    val prompt = buildString {
-                        appendLine("工具调用请求:")
-                        sessionOutput.requests.forEachIndexed { index, req ->
-                            appendLine("  ${index + 1}. ${req.toolName}")
-                            val argsLines = formatArguments(req.arguments)
-                            if (argsLines != null) {
-                                argsLines.forEach { line ->
-                                    appendLine("     $line")
-                                }
-                            } else if (req.arguments.isNotBlank()) {
-                                appendLine("     参数: ${req.arguments}")
-                            }
-                            req.reason.let { appendLine("     原因: $it") }
-                        }
-                        appendLine()
-                        appendLine("使用 /approve <序号> 审批")
+                    sessionOutput.requests.forEach { req ->
+                        sendToSession(sessionId, formatToolRequest(req))
                     }
-                    sendToSession(sessionId, prompt)
                 }
                 is SessionOutput.LlmError -> {
                     sendToSession(sessionId, "LLM 错误: ${sessionOutput.content}")
@@ -331,42 +319,65 @@ class SessionListener(
         return count
     }
 
-    private fun formatArguments(arguments: String): List<String>? {
+
+
+    private fun formatToolRequest(req: ToolCallRequest): String {
+        val toolName = req.toolName
+        val args = req.validatedArgs
+        val reason = req.reason
+
+        if (args == null) return "请求${toolName}"
+
+        val toolKey = toolName.substringBefore("-")
         return trace.catching {
-            val lines = mutableListOf<String>()
-            appendJson(Json.parseToJsonElement(arguments).jsonObject, lines, "")
-            lines
-        }.getOrElse { null }
+            when (toolKey) {
+                "qq" -> "请求${renderQqArgs(Json.decodeFromJsonElement(QqToolFunctions.Args.serializer(), args), reason)}"
+                "bash" -> "请求${renderBashArgs(Json.decodeFromJsonElement(BashArgs.serializer(), args), reason)}"
+                "read" -> "请求${renderReadArgs(Json.decodeFromJsonElement(ReadArgs.serializer(), args), reason)}"
+                else -> "请求${toolName}"
+            }
+        }.getOrElse { "请求${toolName}" }
     }
 
-    private fun appendJson(
-        obj: kotlinx.serialization.json.JsonObject,
-        lines: MutableList<String>,
-        indent: String
-    ) {
-        obj.forEach { (key, value) ->
-            when {
-                value is kotlinx.serialization.json.JsonObject -> {
-                    lines.add("$indent$key:")
-                    appendJson(value, lines, "$indent  ")
-                }
-                value is kotlinx.serialization.json.JsonArray -> {
-                    lines.add("$indent$key:")
-                    value.forEach { item ->
-                        when (item) {
-                            is kotlinx.serialization.json.JsonObject -> {
-                                lines.add("$indent  -")
-                                appendJson(item, lines, "$indent    ")
-                            }
-                            is kotlinx.serialization.json.JsonArray -> {
-                                lines.add("$indent  - $item")
-                            }
-                            else -> lines.add("$indent  - ${item.jsonPrimitive.content}")
-                        }
-                    }
-                }
-                else -> lines.add("$indent$key: ${value.jsonPrimitive.content}")
-            }
+    private fun renderQqArgs(args: QqToolFunctions.Args, reason: String): String {
+        val suffix = (if (reason.isNotBlank()) "（$reason）" else "")
+        return when (args) {
+            is QqToolFunctions.SendMessage -> "发送私聊消息给 ${args.userId}: ${args.message.take(50)}$suffix"
+            is QqToolFunctions.SendGroupMessage -> "发送群消息到 ${args.groupId}: ${args.message.take(50)}$suffix"
+            is QqToolFunctions.DeleteMessage -> "撤回消息 ${args.messageId}$suffix"
+            is QqToolFunctions.GetMessage -> "获取消息详情 ${args.messageId}$suffix"
+            is QqToolFunctions.GetFriendList -> "获取好友列表$suffix"
+            is QqToolFunctions.GetGroupList -> "获取群列表$suffix"
+            is QqToolFunctions.GetGroupMemberList -> "获取群 ${args.groupId} 的成员列表$suffix"
+            is QqToolFunctions.GetGroupMemberInfo -> "获取群 ${args.groupId} 中用户 ${args.userId} 的信息$suffix"
+            is QqToolFunctions.GetGroupMsgHistory -> "获取群 ${args.groupId} 的最近 ${args.count} 条消息$suffix"
+            is QqToolFunctions.GetPrivateMsgHistory -> "获取与 ${args.userId} 的最近 ${args.count} 条私聊消息$suffix"
+            is QqToolFunctions.KickGroupMember -> "将用户 ${args.userId} 踢出群 ${args.groupId}$suffix"
+            is QqToolFunctions.BanGroupMember -> "禁言用户 ${args.userId} ${args.duration} 秒（群 ${args.groupId}）$suffix"
+            is QqToolFunctions.SetGroupCard -> "设置群 ${args.groupId} 中用户 ${args.userId} 的名片为「${args.card}」$suffix"
+            is QqToolFunctions.SetGroupName -> "设置群 ${args.groupId} 的名称为「${args.groupName}」$suffix"
+            is QqToolFunctions.SetGroupAdmin -> if (args.enable) "设置用户 ${args.userId} 为群 ${args.groupId} 管理员$suffix" else "取消用户 ${args.userId} 在群 ${args.groupId} 的管理员$suffix"
+            is QqToolFunctions.GetLoginInfo -> "获取机器人登录信息$suffix"
+            is QqToolFunctions.GetStatus -> "获取机器人状态$suffix"
+            is QqToolFunctions.GetVersionInfo -> "获取版本信息$suffix"
+            is QqToolFunctions.GetImage -> "获取图片 ${args.file}$suffix"
+            is QqToolFunctions.GetRecord -> "获取语音 ${args.file}$suffix"
+            is QqToolFunctions.GetFile -> "获取文件 ${args.file}$suffix"
+            is QqToolFunctions.GetForwardMsg -> "获取合并转发消息 ${args.id}$suffix"
+        }
+    }
+
+    private fun renderBashArgs(args: BashArgs, reason: String): String {
+        val head = if (reason.isNotBlank()) "运行以下命令（$reason）" else "运行以下命令"
+        return "$head\n${args.command}"
+    }
+
+    private fun renderReadArgs(args: ReadArgs, reason: String): String {
+        val suffix = (if (reason.isNotBlank()) "（$reason）" else "")
+        return when (args) {
+            is ReadArgs.File -> "读取文件 ${args.filePath} 的第 ${args.startLine}-${args.endLine} 行$suffix"
+            is ReadArgs.Summarize -> "总结文件 ${args.filePath} 的第 ${args.startLine}-${args.endLine} 行$suffix"
+            is ReadArgs.Unicode -> "读取文件 ${args.filePath} 的前 ${args.maxChars} 字符$suffix"
         }
     }
 }

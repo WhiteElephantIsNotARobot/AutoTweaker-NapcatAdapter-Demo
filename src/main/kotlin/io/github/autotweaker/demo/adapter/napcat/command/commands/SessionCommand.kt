@@ -8,17 +8,6 @@ import io.github.autotweaker.demo.adapter.napcat.permission.Role
 import org.slf4j.LoggerFactory
 import java.util.UUID
 
-/**
- * 会话管理命令
- *
- * 用法：
- *   /session — 显示当前会话
- *   /session list — 列出当前工作区的会话
- *   /session new [标题] — 创建新会话并进入
- *   /session enter <sessionId> — 进入指定会话
- *   /session exit — 退出当前会话
- *   /session remove <sessionId> — 删除指定会话
- */
 class SessionCommand : Command {
 
     private val logger = LoggerFactory.getLogger(this::class.java)
@@ -26,8 +15,7 @@ class SessionCommand : Command {
 
     override val name = "session"
     override val description = "管理会话"
-    override val usage =
-        "/session [list|new|enter|exit|remove] [参数]"
+    override val usage = "/session [list|new|enter|exit|remove] [参数]"
     override val requiredRole = Role.USER
 
     override suspend fun execute(context: CommandContext): String {
@@ -48,9 +36,7 @@ class SessionCommand : Command {
 
     private suspend fun showMySession(context: CommandContext): String {
         val sessionId = context.sessionManager.getActiveSession(context.userId)
-        if (sessionId == null) {
-            return "你没有活跃的会话"
-        }
+            ?: return "你没有活跃的会话"
 
         val handle = trace.catching {
             context.core.session.getHandle(sessionId)
@@ -65,7 +51,6 @@ class SessionCommand : Command {
 
         return buildString {
             appendLine("当前会话:")
-            appendLine("  ID: ${data.id}")
             appendLine("  标题: ${data.title ?: "未设置"}")
             appendLine("  工作区: ${workspace?.meta?.displayName ?: "未知"}")
         }
@@ -84,34 +69,30 @@ class SessionCommand : Command {
             return "当前工作区（${workspace.meta.displayName}）没有会话"
         }
 
-        val sessions = context.core.session.loadData(sessionIds)
-        if (sessions.isEmpty()) {
+        val loadedSessions = context.core.session.loadData(sessionIds)
+        if (loadedSessions.isEmpty()) {
             return "没有会话"
         }
+        val sessionsMap = loadedSessions.associateBy { it.id }
+        val sessions = sessionIds.mapNotNull { sessionsMap[it] }
 
         val activeSessionId = context.sessionManager.getActiveSession(context.userId)
 
         return buildString {
             appendLine("工作区「${workspace.meta.displayName}」的会话:")
-            sessions.forEach { data ->
+            sessions.forEachIndexed { index, data ->
                 val active = if (data.id == activeSessionId) " ← 当前" else ""
-                appendLine("  ${data.title ?: "未设置"}$active")
-                appendLine("    ID: ${data.id}")
+                appendLine("  ${index + 1}. ${data.title ?: "未设置"}$active")
             }
         }
     }
 
-    /**
-     * 创建新会话并进入
-     *
-     * 用法: /session new [标题]
-     */
     private suspend fun newSession(context: CommandContext): String {
         val title = context.args.drop(1).joinToString(" ").take(100).ifEmpty { "新会话" }
 
         return try {
             val handle = context.sessionManager.autoCreateSession(context.userId, title)
-            "会话已创建: ${handle.id}\n标题: $title\n已自动进入此会话"
+            "会话已创建\n标题: $title\n已自动进入此会话"
         } catch (e: IllegalStateException) {
             trace.exception(e)
             e.message ?: "创建会话失败"
@@ -121,26 +102,17 @@ class SessionCommand : Command {
         }
     }
 
-    /**
-     * 进入指定会话
-     *
-     * 用法: /session enter <sessionId>
-     */
     private suspend fun enterSession(context: CommandContext): String {
         if (context.args.size < 2) {
-            return "用法: /session enter <sessionId>"
+            return "用法: /session enter <序号|标题>"
         }
 
-        val sessionId = try {
-            UUID.fromString(context.args[1])
-        } catch (e: IllegalArgumentException) {
-            trace.exception(e)
-            return "无效的会话 ID: ${context.args[1]}"
-        }
+        val sessionId = resolveSessionId(context, context.args[1])
+            ?: return "未找到会话: ${context.args[1]}"
 
         return try {
             context.sessionManager.enterSession(context.userId, sessionId)
-            "已进入会话: $sessionId"
+            "已进入会话"
         } catch (e: IllegalStateException) {
             trace.exception(e)
             logger.warn("Failed to enter session  sessionId={}", sessionId, e)
@@ -148,15 +120,10 @@ class SessionCommand : Command {
         } catch (e: Exception) {
             trace.exception(e)
             logger.warn("Failed to enter session  sessionId={}", sessionId, e)
-            "会话不存在: $sessionId"
+            "会话不存在"
         }
     }
 
-    /**
-     * 退出当前会话
-     *
-     * 用法: /session exit
-     */
     private suspend fun exitSession(context: CommandContext): String {
         val handle = context.sessionManager.getActiveSessionHandle(context.userId)
             ?: return "当前没有活跃会话"
@@ -171,33 +138,45 @@ class SessionCommand : Command {
         }.getOrElse { "退出失败，请稍后重试" }
     }
 
-    /**
-     * 删除指定会话
-     *
-     * 用法: /session remove <sessionId>
-     */
     private suspend fun removeSession(context: CommandContext): String {
         if (context.args.size < 2) {
-            return "用法: /session remove <sessionId>"
+            return "用法: /session remove <序号|标题>"
         }
 
-        val sessionId = try {
-            UUID.fromString(context.args[1])
-        } catch (e: IllegalArgumentException) {
-            return "无效的会话 ID: ${context.args[1]}"
-        }
-
-        val activeSessionId = context.sessionManager.getActiveSession(context.userId)
-        if (sessionId == activeSessionId) {
-            return "不能删除当前活跃会话，请先 /session exit"
-        }
+        val sessionId = resolveSessionId(context, context.args[1])
+            ?: return "未找到会话: ${context.args[1]}"
 
         return try {
             context.core.session.delete(sessionId)
-            "已删除会话: $sessionId"
+            val activeSessionId = context.sessionManager.getActiveSession(context.userId)
+            if (sessionId == activeSessionId) {
+                context.sessionManager.clearActiveSession(context.userId)
+            }
+            "会话已删除"
         } catch (e: Exception) {
             trace.exception(e)
-            "删除会话失败: ${e.message}"
+            "删除失败: ${e.message}"
         }
+    }
+
+    private suspend fun resolveSessionId(context: CommandContext, input: String): UUID? {
+        val workspaceId = context.sessionManager.getUserWorkspace(context.userId) ?: return null
+        val workspace = context.core.session.listWorkspaces().find { it.meta.id == workspaceId } ?: return null
+        val sessionIds = workspace.sessionIds.orEmpty()
+        if (sessionIds.isEmpty()) return null
+        val loadedSessions = context.core.session.loadData(sessionIds)
+        if (loadedSessions.isEmpty()) return null
+        val sessionsMap = loadedSessions.associateBy { it.id }
+        val sessions = sessionIds.mapNotNull { sessionsMap[it] }
+
+        val index = input.toIntOrNull()
+        if (index != null) {
+            return if (index in 1..sessions.size) sessions[index - 1].id else null
+        }
+
+        val lower = input.lowercase()
+        return sessions.find { it.title?.equals(lower, ignoreCase = true) == true }?.id
+            ?: sessions.find { it.title?.lowercase()?.startsWith(lower) == true }?.id
+            ?: sessions.find { it.title?.lowercase()?.contains(lower) == true }?.id
     }
 }
