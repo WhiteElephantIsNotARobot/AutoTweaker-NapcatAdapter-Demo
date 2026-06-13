@@ -368,8 +368,9 @@ class SessionListener(
     }
 
     private fun renderBashArgs(args: BashArgs, reason: String): String {
-        val head = if (reason.isNotBlank()) "运行以下命令（$reason）" else "运行以下命令"
-        return "$head\n${args.command}"
+        val envPart = if (args.envIds.isNotEmpty()) "并注入环境变量${args.envIds.joinToString("、")}" else ""
+        val reasonPart = if (reason.isNotBlank()) "（$reason）" else ""
+        return "运行以下命令${envPart}${reasonPart}\n${args.command}"
     }
 
     private fun renderReadArgs(args: ReadArgs, reason: String): String {
