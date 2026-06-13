@@ -27,6 +27,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 class SessionPersistence(
     private val store: JsonStore,
     private val activeSessions: ConcurrentHashMap<Long, UUID>,
+    private val previousSessions: ConcurrentHashMap<Long, UUID>,
     private val userPrimaryModels: ConcurrentHashMap<Long, UUID>,
     private val userSelectedWorkspaces: ConcurrentHashMap<Long, UUID>,
     private val userThinking: ConcurrentHashMap<Long, Boolean>,
@@ -40,6 +41,7 @@ class SessionPersistence(
 
     companion object {
         private const val SESSION_MAP_KEY = "session_map"
+        private const val PREVIOUS_SESSIONS_KEY = "previous_sessions"
         private const val USER_MODELS_KEY = "user_models"
         private const val USER_WORKSPACES_KEY = "user_workspaces"
         private const val USER_THINKING_KEY = "user_thinking"
@@ -56,6 +58,7 @@ class SessionPersistence(
             val obj = element.jsonObject
 
             obj[SESSION_MAP_KEY]?.let { loadSessionMap(it) }
+            obj[PREVIOUS_SESSIONS_KEY]?.let { loadPreviousSessions(it) }
             obj[USER_MODELS_KEY]?.let { loadUserModels(it) }
             obj[USER_WORKSPACES_KEY]?.let { loadUserWorkspaces(it) }
             obj[USER_THINKING_KEY]?.let { loadUserThinking(it) }
@@ -79,6 +82,11 @@ class SessionPersistence(
             val obj = buildJsonObject {
                 put(SESSION_MAP_KEY, buildJsonObject {
                     activeSessions.forEach { (userId, sessionId) ->
+                        put(userId.toString(), JsonPrimitive(sessionId.toString()))
+                    }
+                })
+                put(PREVIOUS_SESSIONS_KEY, buildJsonObject {
+                    previousSessions.forEach { (userId, sessionId) ->
                         put(userId.toString(), JsonPrimitive(sessionId.toString()))
                     }
                 })
@@ -142,6 +150,18 @@ class SessionPersistence(
 
     private fun loadSessionMap(element: JsonElement) {
         loadMap(element, "session_map", { UUID.fromString(it.jsonPrimitive.content) }, activeSessions)
+    }
+
+    private fun loadPreviousSessions(element: JsonElement) {
+        element.jsonObject.forEach { (key, value) ->
+            try {
+                val userId = key.toLong()
+                val sessionId = UUID.fromString(value.jsonPrimitive.content)
+                previousSessions[userId] = sessionId
+            } catch (e: Exception) {
+                logger.debug("Failed to load previous session  userId={}", key, e)
+            }
+        }
     }
 
     private fun loadUserModels(element: JsonElement) {

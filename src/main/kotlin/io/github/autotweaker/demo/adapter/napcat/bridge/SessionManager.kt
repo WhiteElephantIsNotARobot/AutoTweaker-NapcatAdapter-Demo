@@ -67,6 +67,7 @@ class SessionManager(
     private val persistence = SessionPersistence(
         store = core.config.jsonStore(SessionManager::class),
         activeSessions = activeSessions,
+        previousSessions = previousSessions,
         userPrimaryModels = userPrimaryModels,
         userSelectedWorkspaces = userSelectedWorkspaces,
         userThinking = userThinking,
