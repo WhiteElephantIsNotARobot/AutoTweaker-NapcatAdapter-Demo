@@ -213,4 +213,24 @@ interface NapCatApi {
      * @return 合并转发消息列表
      */
     suspend fun getForwardMsg(id: String): List<ForwardMessage>
+
+    // ==================== 合并转发发送 API ====================
+
+    /**
+     * 发送私聊合并转发消息
+     *
+     * @param userId 目标用户的 QQ 号
+     * @param message 合并转发节点列表
+     * @return 包含消息 ID 的 [MessageResult]
+     */
+    suspend fun sendPrivateForwardMsg(userId: Long, message: MessageChain): MessageResult
+
+    /**
+     * 发送群合并转发消息
+     *
+     * @param groupId 目标群号
+     * @param message 合并转发节点列表
+     * @return 包含消息 ID 的 [MessageResult]
+     */
+    suspend fun sendGroupForwardMsg(groupId: Long, message: MessageChain): MessageResult
 }

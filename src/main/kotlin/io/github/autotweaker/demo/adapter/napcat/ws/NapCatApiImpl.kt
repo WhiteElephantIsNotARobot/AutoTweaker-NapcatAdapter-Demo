@@ -278,4 +278,20 @@ abstract class NapCatApiImpl(
             }
         }
     }
+
+    override suspend fun sendPrivateForwardMsg(userId: Long, message: MessageChain): MessageResult {
+        val params = buildMap {
+            put("user_id", JsonPrimitive(userId))
+            put("message", json.encodeToJsonElement(message))
+        }
+        return callApiAndDecode("send_private_forward_msg", params, MessageResult.serializer())
+    }
+
+    override suspend fun sendGroupForwardMsg(groupId: Long, message: MessageChain): MessageResult {
+        val params = buildMap {
+            put("group_id", JsonPrimitive(groupId))
+            put("message", json.encodeToJsonElement(message))
+        }
+        return callApiAndDecode("send_group_forward_msg", params, MessageResult.serializer())
+    }
 }
