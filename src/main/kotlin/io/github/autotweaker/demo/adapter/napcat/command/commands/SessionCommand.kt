@@ -69,10 +69,12 @@ class SessionCommand : Command {
             return "当前工作区（${workspace.meta.displayName}）没有会话"
         }
 
-        val sessions = context.core.session.loadData(sessionIds)
-        if (sessions.isEmpty()) {
+        val loadedSessions = context.core.session.loadData(sessionIds)
+        if (loadedSessions.isEmpty()) {
             return "没有会话"
         }
+        val sessionsMap = loadedSessions.associateBy { it.id }
+        val sessions = sessionIds.mapNotNull { sessionsMap[it] }
 
         val activeSessionId = context.sessionManager.getActiveSession(context.userId)
 
@@ -146,7 +148,10 @@ class SessionCommand : Command {
 
         return try {
             context.core.session.delete(sessionId)
-            context.sessionManager.clearActiveSession(context.userId)
+            val activeSessionId = context.sessionManager.getActiveSession(context.userId)
+            if (sessionId == activeSessionId) {
+                context.sessionManager.clearActiveSession(context.userId)
+            }
             "会话已删除"
         } catch (e: Exception) {
             trace.exception(e)
@@ -159,8 +164,10 @@ class SessionCommand : Command {
         val workspace = context.core.session.listWorkspaces().find { it.meta.id == workspaceId } ?: return null
         val sessionIds = workspace.sessionIds.orEmpty()
         if (sessionIds.isEmpty()) return null
-        val sessions = context.core.session.loadData(sessionIds)
-        if (sessions.isEmpty()) return null
+        val loadedSessions = context.core.session.loadData(sessionIds)
+        if (loadedSessions.isEmpty()) return null
+        val sessionsMap = loadedSessions.associateBy { it.id }
+        val sessions = sessionIds.mapNotNull { sessionsMap[it] }
 
         val index = input.toIntOrNull()
         if (index != null) {
