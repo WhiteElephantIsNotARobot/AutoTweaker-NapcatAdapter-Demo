@@ -20,7 +20,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.autotweaker:api:0.1.0-alpha.31+f3ce498")
+    implementation("io.github.autotweaker:api:0.1.0-alpha.33+870f1f4")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
     implementation("io.ktor:ktor-client-core:3.1.0")

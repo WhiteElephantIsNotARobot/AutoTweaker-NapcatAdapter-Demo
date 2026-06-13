@@ -184,7 +184,7 @@ class SessionListener(
                     val prompt = buildString {
                         appendLine("工具调用请求:")
                         sessionOutput.requests.forEachIndexed { index, req ->
-                            appendLine("  ${index + 1}. ${req.name}")
+                            appendLine("  ${index + 1}. ${req.toolName}")
                             val argsLines = formatArguments(req.arguments)
                             if (argsLines != null) {
                                 argsLines.forEach { line ->
@@ -193,7 +193,7 @@ class SessionListener(
                             } else if (req.arguments.isNotBlank()) {
                                 appendLine("     参数: ${req.arguments}")
                             }
-                            req.reason?.let { appendLine("     原因: $it") }
+                            req.reason.let { appendLine("     原因: $it") }
                         }
                         appendLine()
                         appendLine("使用 /approve <序号> 审批")
