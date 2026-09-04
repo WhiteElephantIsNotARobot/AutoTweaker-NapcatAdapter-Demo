@@ -1,8 +1,8 @@
 plugins {
-    kotlin("jvm") version "2.3.21"
-    kotlin("kapt") version "2.3.21"
-    kotlin("plugin.serialization") version "2.3.21"
-
+    kotlin("jvm") version "2.4.10"
+    kotlin("kapt") version "2.4.10"
+    kotlin("plugin.serialization") version "2.4.10"
+    id("io.github.autotweaker.toolgen") version "0.1.1+fe1ddebf"
 }
 
 group = "io.github.autotweaker.demo.adapter.napcat"
@@ -13,14 +13,16 @@ repositories {
     maven {
         url = uri("https://maven.pkg.github.com/AutoTweaker/core")
         credentials {
-            username = project.findProperty("gpr.user") as String? ?: System.getenv("GITHUB_ACTOR")
-            password = project.findProperty("gpr.key") as String? ?: System.getenv("GITHUB_TOKEN")
+            username = providers.gradleProperty("gpr.user")
+                .orElse(providers.environmentVariable("GITHUB_ACTOR")).getOrElse("")
+            password = providers.gradleProperty("gpr.key")
+                .orElse(providers.environmentVariable("GITHUB_TOKEN")).getOrElse("")
         }
     }
 }
 
 dependencies {
-    implementation("io.github.autotweaker:api:0.1.0-alpha.33+870f1f4")
+    implementation("io.github.autotweaker:api:0.1.1+fe1ddebf")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
     implementation("io.ktor:ktor-client-core:3.1.0")
@@ -31,3 +33,7 @@ dependencies {
     kapt("com.google.auto.service:auto-service:1.1.1")
 }
 
+toolgen {
+    // scriptsDirectory 默认 src/main/tools；outputDirectory 默认 build/generated/toolgen
+    // attachToSourceSet 默认 true：生成源码自动挂入 Kotlin 编译
+}
