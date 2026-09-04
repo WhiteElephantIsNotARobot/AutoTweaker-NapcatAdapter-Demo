@@ -1,7 +1,3 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Project Overview
 
 NapCat adapter plugin for AutoTweaker — bridges NapCat QQ chat bot (OneBot 11 protocol) with the AutoTweaker Core API (LLM agent platform). Users interact with an LLM agent via QQ private/group messages.
