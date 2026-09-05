@@ -20,6 +20,7 @@ import io.github.autotweaker.demo.adapter.napcat.model.event.LifecycleMetaEvent
 import io.github.autotweaker.demo.adapter.napcat.model.event.MessageEvent
 import io.github.autotweaker.demo.adapter.napcat.model.event.NotifyNoticeEvent
 import io.github.autotweaker.demo.adapter.napcat.model.event.PrivateMessageEvent
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -78,6 +79,6 @@ object EventParser : Traceable {
 		else -> null
 	}
 
-	private fun <T> decode(json: Json, obj: JsonObject, serializer: kotlinx.serialization.KSerializer<T>): T? =
+	private fun <T> decode(json: Json, obj: JsonObject, serializer: KSerializer<T>): T? =
 		trace.catching { json.decodeFromJsonElement(serializer, obj) }.getOrNull()
 }

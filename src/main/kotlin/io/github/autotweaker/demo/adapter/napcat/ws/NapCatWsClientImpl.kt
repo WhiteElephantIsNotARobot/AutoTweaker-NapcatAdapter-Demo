@@ -17,10 +17,7 @@ import io.ktor.websocket.close
 import io.ktor.websocket.readText
 import io.ktor.websocket.send
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -91,7 +88,7 @@ class NapCatWsClientImpl(
 			}
 		}
 
-		connectJob = CoroutineScope(Dispatchers.Default + SupervisorJob()).launch {
+		connectJob = scope().launch {
 			var retryDelayMs = INITIAL_RETRY_DELAY_MS
 			var wasEverConnected = false
 			while (isActive) {

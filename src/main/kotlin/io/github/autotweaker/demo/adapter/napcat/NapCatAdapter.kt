@@ -3,6 +3,7 @@ package io.github.autotweaker.demo.adapter.napcat
 import com.google.auto.service.AutoService
 import io.github.autotweaker.api.Loggable
 import io.github.autotweaker.api.log
+import io.github.autotweaker.api.scope
 import io.github.autotweaker.api.adapter.Adapter
 import io.github.autotweaker.api.adapter.CoreAPI
 import io.github.autotweaker.api.get
@@ -17,12 +18,9 @@ import io.github.autotweaker.demo.adapter.napcat.model.event.PrivateMessageEvent
 import io.github.autotweaker.demo.adapter.napcat.setting.Host
 import io.github.autotweaker.demo.adapter.napcat.setting.Port
 import io.github.autotweaker.demo.adapter.napcat.setting.Token
+import io.github.autotweaker.demo.adapter.napcat.ws.NapCatWsClient
 import io.github.autotweaker.demo.adapter.napcat.ws.NapCatWsClientImpl
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -34,10 +32,26 @@ import kotlinx.coroutines.launch
 @AutoService(Adapter::class)
 class NapCatAdapter : Adapter, Loggable {
 
+	/**
+	 * 插件共享 classloader，qq 工具经此获取 core 与 NapCat 客户端。
+	 */
+	companion object {
+		@Volatile
+		private var runtime: Runtime? = null
+
+		fun runtime(): Runtime? = runtime
+
+		class Runtime(
+			val core: CoreAPI,
+			val client: NapCatWsClient,
+			val isRunning: () -> Boolean,
+		)
+	}
+
 	private lateinit var core: CoreAPI
 	private lateinit var client: NapCatWsClientImpl
 
-	private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+	private val scope = scope()
 	private var connectJob: Job? = null
 	private var eventJob: Job? = null
 
@@ -50,6 +64,7 @@ class NapCatAdapter : Adapter, Loggable {
 	override suspend fun init(core: CoreAPI): AdapterInfo {
 		this.core = core
 		this.client = NapCatWsClientImpl()
+		runtime = Runtime(core, client) { running }
 		return AdapterInfo(
 			name = "napcat".toKebab(),
 			description = "NapCat QQ 适配器：通过 OneBot 11 把 AutoTweaker 接入 QQ",
